@@ -72,6 +72,7 @@ test("UI contract keeps the status-led structure and all functional controls", a
     assert.match(html, new RegExp(`id="${id}"`));
   }
   assert.match(html, /type="module" src="app\.js"/);
+  assert.match(html, /assets\/brand-logo-v1\.png/);
   assert.match(script, /statusView\(status\)/);
   assert.match(script, /hero-action/);
   assert.match(css, /color-scheme: light/);

@@ -2,14 +2,15 @@
 
 ## Automated coverage
 
-The current suite covers:
+The current suite covers the actual interfaces that VPN clients expose to CNG:
 
-- PAC route parsing and relay-loop rejection
+- macOS `scutil --proxy` field parsing, Windows proxy registry parsing, PAC route parsing and relay-loop rejection
+- upper/lowercase proxy environment variables and the standard HTTP, HTTPS and SOCKS5 candidate forms
 - candidate ordering and credential redaction, including serialized status/diagnostic output
 - failure classification, user-facing next-step guidance, and JSON-RPC version rejection
-- HTTP CONNECT byte tunnelling and upstream HTTP 407
+- HTTP CONNECT byte tunnelling, SOCKS5 remote resolution, and upstream HTTP 407
 - disabled direct fallback with a target-side leakage assertion
-- upstream replacement affecting only new connections
+- an unavailable old VPN port falling through to the recovered port, plus upstream replacement affecting only new connections
 - LaunchAgent XML escaping and reversible terminal block removal
 - proxy environment injection helpers and configuration-safe defaults
 
@@ -22,7 +23,21 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-The UI suite verifies the status-led hierarchy contract: healthy routes stay calm, VPN failures expose a recovery CTA, non-network failures keep their Codex action, and the rendered surface retains all functional control IDs. It runs in CI on macOS and Windows without browser-test dependencies.
+The UI suite verifies the status-led hierarchy contract: healthy routes stay calm, VPN failures expose a recovery CTA, non-network failures keep their Codex action, the branded asset is present, and the rendered surface retains all functional control IDs. It runs in CI on macOS and Windows without browser-test dependencies.
+
+## Automated VPN interface matrix
+
+| VPN exposes to the operating system | Automated assertion | Result expected from CNG |
+| --- | --- | --- |
+| HTTP local port | CONNECT byte tunnel, 407, old-port recovery | New Codex connections use a healthy HTTP route |
+| SOCKS5 local port | SOCKS5 handshake and remote DNS tunnel | DNS stays at the proxy route |
+| System PAC | `PROXY`, `HTTPS`, `SOCKS5`, `SOCKS`, IPv6 parsing | Ordered candidates are discovered without a relay loop |
+| macOS system proxy | HTTP/SOCKS/PAC `scutil` fields | Entries are extracted without changing system settings |
+| Windows system proxy | `ProxyServer`, protocol mapping and registry fields | HTTP/HTTPS/SOCKS entries are extracted without changing system settings |
+| VPN port changes | Existing tunnel plus new upstream replacement | Existing healthy tunnel stays intact; the next connection uses the new route |
+| VPN stopped | No-route relay request with a target-side listener | CNG returns a local proxy error; it never makes a direct connection |
+
+This is protocol-level compatibility verification, not an endorsement or certification of any VPN provider. A client is compatible when it exposes a reachable system PAC, HTTP, HTTPS CONNECT or SOCKS5 entry.
 
 ## Manual macOS matrix
 

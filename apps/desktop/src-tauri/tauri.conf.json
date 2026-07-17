@@ -28,7 +28,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
-    "icon": ["icons/icon.png"],
+    "icon": ["icons/brand-logo-v1.png", "icons/brand-logo-v1.ico"],
     "category": "Utility",
     "shortDescription": "Stable proxy routing and diagnostics for Codex",
     "longDescription": "An unofficial, open-source network guard for Codex App and CLI.",

@@ -1,10 +1,29 @@
 use std::fs;
-use std::io::BufWriter;
+use std::io::{BufReader, BufWriter};
 use std::path::Path;
 
 fn main() {
     generate_development_icons();
+    generate_brand_ico();
     tauri_build::build()
+}
+
+fn generate_brand_ico() {
+    let directory = Path::new("icons");
+    let png_path = directory.join("brand-logo-v1-256.png");
+    let ico_path = directory.join("brand-logo-v1.ico");
+    println!("cargo:rerun-if-changed={}", png_path.display());
+    if !png_path.exists() {
+        return;
+    }
+
+    let input = fs::File::open(&png_path).expect("open brand PNG icon");
+    let image = ico::IconImage::read_png(BufReader::new(input)).expect("read brand PNG icon");
+    let mut icon = ico::IconDir::new(ico::ResourceType::Icon);
+    icon.add_entry(ico::IconDirEntry::encode(&image).expect("encode brand ICO icon"));
+    let output = fs::File::create(ico_path).expect("create brand ICO icon");
+    icon.write(BufWriter::new(output))
+        .expect("write brand ICO icon");
 }
 
 fn generate_development_icons() {

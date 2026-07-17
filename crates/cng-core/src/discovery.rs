@@ -43,6 +43,10 @@ pub async fn discover(config: &GuardConfig) -> Result<Vec<UpstreamCandidate>> {
 }
 
 fn discover_environment() -> Vec<UpstreamCandidate> {
+    discover_environment_from(|key| std::env::var(key).ok())
+}
+
+fn discover_environment_from(value_for: impl Fn(&str) -> Option<String>) -> Vec<UpstreamCandidate> {
     let mut values = Vec::new();
     for key in [
         "HTTPS_PROXY",
@@ -52,7 +56,7 @@ fn discover_environment() -> Vec<UpstreamCandidate> {
         "ALL_PROXY",
         "all_proxy",
     ] {
-        if let Ok(value) = std::env::var(key) {
+        if let Some(value) = value_for(key) {
             add_url(
                 &mut values,
                 &value,
@@ -124,7 +128,7 @@ async fn discover_macos_system_proxy() -> Result<Vec<UpstreamCandidate>> {
     Ok(candidates)
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", test))]
 fn parse_scutil_fields(text: &str) -> HashMap<String, String> {
     let mut fields = HashMap::new();
     let pattern = Regex::new(r"(?m)^\s*([A-Za-z0-9]+)\s*:\s*(.+?)\s*$").expect("valid regex");
@@ -349,12 +353,14 @@ mod tests {
     #[test]
     fn parses_ordered_pac_candidates() {
         let values = parse_pac_candidates(
-            r#"return "PROXY 127.0.0.1:7897; SOCKS5 127.0.0.1:1080; DIRECT";"#,
+            r#"return "PROXY 127.0.0.1:7897; HTTPS secure.example:443; SOCKS5 127.0.0.1:1080; SOCKS [::1]:1081; DIRECT";"#,
         );
-        assert_eq!(values.len(), 2);
+        assert_eq!(values.len(), 4);
         assert_eq!(values[0].source, CandidateSource::SystemPac);
         assert_eq!(values[0].url.scheme(), "http");
-        assert_eq!(values[1].url.scheme(), "socks5h");
+        assert_eq!(values[1].url.scheme(), "https");
+        assert_eq!(values[2].url.scheme(), "socks5h");
+        assert_eq!(values[3].url.scheme(), "socks5h");
     }
 
     #[test]
@@ -372,11 +378,38 @@ mod tests {
     #[test]
     fn parses_windows_proxy_settings() {
         let fields = parse_windows_registry_values(
-            "    ProxyEnable    REG_DWORD    0x1\n    ProxyServer    REG_SZ    http=127.0.0.1:7890;socks=127.0.0.1:7891\n",
+            "    ProxyEnable    REG_DWORD    0x1\n    ProxyServer    REG_SZ    http=127.0.0.1:7890;https=127.0.0.1:7897;socks=127.0.0.1:7891\n",
         );
         assert_eq!(fields.get("ProxyEnable"), Some(&"0x1".to_string()));
         let values = parse_windows_proxy_server(fields.get("ProxyServer").unwrap());
+        assert_eq!(values.len(), 3);
+        assert_eq!(values[0].url.scheme(), "http");
+        assert_eq!(values[1].url.scheme(), "https");
+        assert_eq!(values[2].url.scheme(), "socks5h");
+    }
+
+    #[test]
+    fn parses_macos_pac_and_explicit_proxy_fields() {
+        let fields = parse_scutil_fields(
+            "<dictionary> {\n  HTTPEnable : 1\n  HTTPProxy : 127.0.0.1\n  HTTPPort : 7890\n  SOCKSEnable : 1\n  SOCKSProxy : 127.0.0.1\n  SOCKSPort : 7891\n  ProxyAutoConfigEnable : 1\n  ProxyAutoConfigURLString : http://127.0.0.1:9090/proxy.pac\n}",
+        );
+        assert_eq!(fields.get("HTTPProxy"), Some(&"127.0.0.1".to_string()));
+        assert_eq!(fields.get("SOCKSPort"), Some(&"7891".to_string()));
+        assert_eq!(
+            fields.get("ProxyAutoConfigURLString"),
+            Some(&"http://127.0.0.1:9090/proxy.pac".to_string())
+        );
+    }
+
+    #[test]
+    fn discovers_all_supported_proxy_environment_spellings() {
+        let values = discover_environment_from(|key| match key {
+            "HTTPS_PROXY" => Some("http://127.0.0.1:7897".to_string()),
+            "ALL_PROXY" => Some("socks5h://127.0.0.1:1080".to_string()),
+            _ => None,
+        });
         assert_eq!(values.len(), 2);
+        assert_eq!(values[0].source, CandidateSource::Environment);
         assert_eq!(values[0].url.scheme(), "http");
         assert_eq!(values[1].url.scheme(), "socks5h");
     }

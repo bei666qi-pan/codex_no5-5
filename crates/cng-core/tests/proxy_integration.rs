@@ -276,3 +276,33 @@ async fn upstream_switch_only_affects_new_connections() {
     proxy_b_task.abort();
     echo_task.abort();
 }
+
+#[tokio::test]
+async fn failed_vpn_port_falls_through_to_the_new_healthy_port() {
+    let (echo, echo_task) = spawn_echo_server().await;
+    let closed_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let closed_port = closed_listener.local_addr().unwrap();
+    drop(closed_listener);
+    let (recovered_proxy, recovered_count, recovered_task) = spawn_http_proxy(false).await;
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let relay = listener.local_addr().unwrap();
+    let runtime = ProxyRuntime::new(&GuardConfig::default());
+    runtime
+        .replace_candidates(vec![
+            healthy(candidate(closed_port, "old VPN port")),
+            healthy(candidate(recovered_proxy, "new VPN port")),
+        ])
+        .await;
+    let relay_task = tokio::spawn(run_proxy(listener, runtime));
+
+    let mut connection = connect_relay(relay, echo).await;
+    connection.write_all(b"recovered").await.unwrap();
+    let mut response = [0u8; 9];
+    connection.read_exact(&mut response).await.unwrap();
+    assert_eq!(&response, b"recovered");
+    assert_eq!(recovered_count.load(Ordering::SeqCst), 1);
+
+    relay_task.abort();
+    recovered_task.abort();
+    echo_task.abort();
+}
