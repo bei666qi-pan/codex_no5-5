@@ -1,18 +1,19 @@
-export const STATUS_META = {
-  protected: { badge: "连接受保护", tone: "success", dot: "protected" },
-  degraded: { badge: "连接需要关注", tone: "warning", dot: "degraded" },
-  vpn_unavailable: { badge: "需要 VPN", tone: "danger", dot: "failed" },
-  non_network_failure: { badge: "Codex 需要处理", tone: "danger", dot: "failed" },
-  paused: { badge: "保护已暂停", tone: "warning", dot: "degraded" },
+import { t } from "./i18n.js";
+
+const STATUS_META = {
+  protected: { badge: "status_protected", tone: "success", dot: "protected" },
+  degraded: { badge: "status_degraded", tone: "warning", dot: "degraded" },
+  vpn_unavailable: { badge: "status_vpn_unavailable", tone: "danger", dot: "failed" },
+  non_network_failure: { badge: "status_non_network_failure", tone: "danger", dot: "failed" },
+  paused: { badge: "status_paused", tone: "warning", dot: "degraded" },
 };
 
-const FALLBACK_GUIDANCE = {
-  protected: { title: "已保护", detail: "Codex 正通过健康代理连接。" },
-  degraded: { title: "连接降级", detail: "代理可用，但最近检测不稳定。" },
-  vpn_unavailable: { title: "VPN 未启动", detail: "没有发现可用的本地代理入口。" },
-  non_network_failure: { title: "Codex 非网络故障", detail: "代理可用，但 Codex 本身返回了错误。" },
-  paused: { title: "保护已暂停", detail: "守护进程暂不转发 Codex 连接。" },
-  unknown: { title: "正在检查连接", detail: "正在等待本地守护进程返回状态。" },
+const SOURCE_LABELS = {
+  manual: "Manual",
+  system_pac: "System PAC",
+  system_proxy: "System proxy",
+  environment: "Environment",
+  known_loopback: "Known local port",
 };
 
 export function formatLatency(value) {
@@ -21,19 +22,26 @@ export function formatLatency(value) {
   return `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)} s`;
 }
 
-export function formatRemote(remote = {}) {
-  if (remote.online) return "在线";
-  if (remote.supported) return "待连接";
-  return "当前版本不支持";
+export function formatRemote(remote = {}, locale = "zh") {
+  if (remote.online) return t(locale, "remote_online");
+  if (remote.supported) return t(locale, "remote_pending");
+  return t(locale, "remote_unsupported");
 }
 
-export function statusView(status = {}) {
+export function statusView(status = {}, locale = "zh") {
   const key = STATUS_META[status.status] ? status.status : "unknown";
-  const meta = STATUS_META[key] || { badge: "正在检查", tone: "neutral", dot: "unknown" };
-  const fallback = FALLBACK_GUIDANCE[key];
+  const meta = STATUS_META[key]
+    ? { ...STATUS_META[key], badge: t(locale, STATUS_META[key].badge) }
+    : { badge: t(locale, "status_unknown"), tone: "neutral", dot: "unknown" };
+  const fallback = { title: t(locale, `${key}_title`), detail: t(locale, `${key}_detail`) };
+  const backendGuidance = status.guidance || {};
   const guidance = {
     ...fallback,
-    ...(status.guidance || {}),
+    ...(locale === "zh" ? backendGuidance : {}),
+    action: backendGuidance.action,
+    action_label: backendGuidance.action
+      ? t(locale, `action_${backendGuidance.action}`)
+      : backendGuidance.action_label,
   };
   const active = status.active_upstream;
   const showNotice = key !== "protected" || Boolean(status.last_failure);
@@ -45,15 +53,17 @@ export function statusView(status = {}) {
     guidance,
     showNotice,
     showHeroAction,
-    diagnosticTitle: status.last_failure ? `最近诊断 · ${status.last_failure.class}` : "下一步",
+    diagnosticTitle: status.last_failure
+      ? t(locale, "recent_diagnostic", { type: status.last_failure.class })
+      : t(locale, "next_step"),
     diagnosticMessage: status.last_failure
       ? `${status.last_failure.summary}\n\n${guidance.detail}`
       : guidance.detail,
     relay: status.listen || "—",
-    upstream: active?.candidate?.label || "无可用上游",
-    upstreamSource: active?.candidate?.source?.replaceAll("_", " ") || "未选择上游",
+    upstream: active?.candidate?.label || t(locale, "source_unknown"),
+    upstreamSource: SOURCE_LABELS[active?.candidate?.source] || t(locale, "source_unknown"),
     latency: formatLatency(active?.latency_ms),
-    remote: formatRemote(status.remote_control),
-    pauseLabel: status.paused ? "恢复保护" : "暂停保护",
+    remote: formatRemote(status.remote_control, locale),
+    pauseLabel: status.paused ? t(locale, "resume_protection") : t(locale, "pause"),
   };
 }

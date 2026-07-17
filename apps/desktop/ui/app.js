@@ -1,7 +1,10 @@
+import { applyStaticTranslations, loadLocale, saveLocale, t } from "./i18n.js";
 import { statusView } from "./state.js";
 
 const invoke = window.__TAURI__.core.invoke;
 let current = null;
+let daemonError = null;
+let locale = loadLocale();
 
 const $ = (id) => document.getElementById(id);
 
@@ -11,7 +14,7 @@ function setText(id, value) {
 
 function render(status) {
   current = status;
-  const view = statusView(status);
+  const view = statusView(status, locale);
   document.body.dataset.tone = view.meta.tone;
   $("status-card").dataset.status = view.key;
   setText("status-badge", view.meta.badge);
@@ -42,14 +45,15 @@ function render(status) {
 }
 
 function renderDaemonUnavailable(error) {
+  daemonError = error;
   document.body.dataset.tone = "danger";
-  setText("status-badge", "需要启用守护进程");
-  setText("status-title", "尚未开始保护 Codex");
-  setText("status-detail", "完成一次检测即可让 Codex 固定通过当前 VPN 连接。");
+  setText("status-badge", t(locale, "daemon_badge"));
+  setText("status-title", t(locale, "daemon_title"));
+  setText("status-detail", t(locale, "daemon_detail"));
   $("status-dot").className = "dot failed";
   $("onboarding").classList.remove("hidden");
   $("diagnostic").classList.remove("hidden");
-  setText("diagnostic-class", "本地守护进程未运行");
+  setText("diagnostic-class", t(locale, "daemon_not_running"));
   setText("diagnostic-message", String(error));
   $("diagnostic-action").classList.add("hidden");
 }
@@ -57,6 +61,7 @@ function renderDaemonUnavailable(error) {
 async function load(method = "guard_status") {
   try {
     render(await invoke(method));
+    daemonError = null;
     $("onboarding").classList.add("hidden");
   } catch (error) {
     renderDaemonUnavailable(error);
@@ -76,7 +81,7 @@ async function runGuidanceAction() {
     if (action === "open_codex") return invoke("open_codex");
     if (action === "wait") {
       const path = await invoke("export_diagnostic");
-      return showOutput(`已导出脱敏诊断：${path}`);
+      return showOutput(t(locale, "exported_diagnostic", { path }));
     }
   } catch (error) {
     return showOutput(String(error));
@@ -100,29 +105,29 @@ $("remote-pair").addEventListener("click", () => runQuietAction(async () => show
 $("doctor").addEventListener("click", () => runQuietAction(async () => showOutput(await invoke("doctor"))));
 $("export-diagnostic").addEventListener("click", () => runQuietAction(async () => {
   const path = await invoke("export_diagnostic");
-  await showOutput(`已导出脱敏诊断：${path}`);
+  await showOutput(t(locale, "exported_diagnostic", { path }));
 }));
 $("pause").addEventListener("click", () => runQuietAction(async () => render(await invoke("set_paused", { paused: !current?.paused }))));
 $("upstream-form").addEventListener("submit", (event) => runQuietAction(async () => {
   event.preventDefault();
   render(await invoke("set_upstream", { url: $("upstream-input").value }));
-  await showOutput("本地代理已验证并启用。若 VPN 改端口，可随时恢复自动选择。");
+  await showOutput(t(locale, "upstream_enabled"));
 }));
 $("upstream-auto").addEventListener("click", () => runQuietAction(async () => {
   render(await invoke("set_upstream", { url: "auto" }));
-  await showOutput("已恢复自动选择。CNG 会继续发现 VPN 当前的本地入口。");
+  await showOutput(t(locale, "upstream_auto_enabled"));
 }));
 $("install").addEventListener("click", async () => {
   const button = $("install");
   button.disabled = true;
-  button.textContent = "正在检测…";
+  button.textContent = t(locale, "checking");
   try {
     const probe = await invoke("onboarding_probe");
     $("step-codex").classList.toggle("done", probe.codex_found);
     $("step-vpn").classList.toggle("done", probe.healthy_count > 0);
-    if (!probe.codex_found) throw new Error("未找到 Codex App 或 CLI");
-    if (!probe.healthy_count) throw new Error("未找到可用 VPN 代理，请先启动 VPN");
-    button.textContent = "正在启用…";
+    if (!probe.codex_found) throw new Error(t(locale, "codex_missing"));
+    if (!probe.healthy_count) throw new Error(t(locale, "vpn_missing"));
+    button.textContent = t(locale, "enabling");
     const service = await invoke("install_guard");
     $("step-service").classList.toggle("done", service.running);
     $("restart-tip").classList.remove("hidden");
@@ -132,7 +137,7 @@ $("install").addEventListener("click", async () => {
     await showOutput(String(error));
   } finally {
     button.disabled = false;
-    button.textContent = "一键检测并启用";
+    button.textContent = t(locale, "install");
   }
 });
 $("migrate-legacy").addEventListener("click", () => runQuietAction(async () => {
@@ -140,5 +145,15 @@ $("migrate-legacy").addEventListener("click", () => runQuietAction(async () => {
   $("migrate-legacy").classList.add("hidden");
 }));
 
+$("locale").value = locale;
+$("locale").addEventListener("change", (event) => {
+  locale = event.target.value;
+  saveLocale(locale);
+  applyStaticTranslations(locale);
+  if (current) render(current);
+  else if (daemonError) renderDaemonUnavailable(daemonError);
+});
+
+applyStaticTranslations(locale);
 load();
 setInterval(() => load(), 10_000);

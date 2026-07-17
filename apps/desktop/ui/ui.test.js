@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { readFile } from "node:fs/promises";
 
+import { t } from "./i18n.js";
 import { formatLatency, formatRemote, statusView } from "./state.js";
 
 test("protected state keeps the interface calm and surfaces its healthy route", () => {
@@ -60,6 +61,23 @@ test("formatters avoid misleading technical placeholders", () => {
   assert.equal(formatLatency(1040), "1.0 s");
   assert.equal(formatRemote({ online: true }), "在线");
   assert.equal(formatRemote({ supported: false }), "当前版本不支持");
+  assert.equal(formatRemote({ online: true }, "en"), "Online");
+});
+
+test("English status view localizes status guidance and actions", () => {
+  const view = statusView({
+    status: "vpn_unavailable",
+    guidance: { title: "VPN 未启动", detail: "没有可用入口", action: "refresh", action_label: "重新检测" },
+  }, "en");
+  assert.equal(view.meta.badge, "VPN required");
+  assert.equal(view.guidance.title, "VPN is not running");
+  assert.equal(view.guidance.action_label, "Refresh check");
+});
+
+test("translation catalog provides both supported UI languages", () => {
+  assert.equal(t("zh", "install"), "一键检测并启用");
+  assert.equal(t("en", "install"), "Check and enable");
+  assert.equal(t("en", "exported_diagnostic", { path: "/tmp/report.json" }), "Redacted diagnostics exported: /tmp/report.json");
 });
 
 test("UI contract keeps the status-led structure and all functional controls", async () => {
@@ -73,7 +91,9 @@ test("UI contract keeps the status-led structure and all functional controls", a
   }
   assert.match(html, /type="module" src="app\.js"/);
   assert.match(html, /assets\/brand-logo-v1\.png/);
-  assert.match(script, /statusView\(status\)/);
+  assert.match(html, /id="locale"/);
+  assert.match(script, /applyStaticTranslations/);
+  assert.match(script, /statusView\(status, locale\)/);
   assert.match(script, /hero-action/);
   assert.match(css, /color-scheme: light/);
   assert.match(css, /\.status-card/);

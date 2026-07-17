@@ -7,46 +7,59 @@
 <p align="center"><strong>让 Codex 稳定走你的 VPN，不再靠反复重试碰运气。</strong></p>
 
 <p align="center">
+  <a href="README.en.md">English</a> ·
   <a href="https://github.com/bei666qi-pan/codex_no5-5/releases">下载 Releases</a> ·
-  <a href="#三步开始">三步开始</a> ·
+  <a href="#快速开始">快速开始</a> ·
   <a href="#常见问题">常见问题</a>
 </p>
 
 > 非 OpenAI 官方项目。Codex Network Guard（简称 `CNG`）与 OpenAI 无隶属或背书关系。
 
-你已经有 VPN、也能打开 Codex，但它常常卡在 `5/5`、重试很久才连接？CNG 就是为这个场景做的。它会为 **Codex App 和 CLI** 建立一个固定的本机入口，自动接住你的 VPN；VPN 重启、切换节点、端口变化后，下一次 Codex 连接会自动改走新的可用路径。
+Codex 能打开但经常卡在 `5/5`、VPN 重启后要等很久才恢复、App 和 CLI 的代理行为不一致？CNG 为 **Codex App 和 CLI** 提供一个固定的本机入口：它会发现你的 VPN 已经暴露的 PAC、HTTP、HTTPS CONNECT 或 SOCKS5 入口，并把新的 Codex 连接交给当前健康的路径。
 
-**你不需要懂代理、端口、TUN 或 PAC。** 正常情况下，打开应用后点一次「一键检测并启用」，重新打开一次 Codex，就可以继续使用。
+## 目录
 
-## 它能替你做什么
+- [快速开始](#快速开始)
+- [它能解决什么](#它能解决什么)
+- [支持范围](#支持范围)
+- [安全与隐私](#安全与隐私)
+- [常见问题](#常见问题)
+- [CLI 与高级使用](#cli-与高级使用)
+- [开发、测试与发布](#开发测试与发布)
 
-| 你遇到的情况 | CNG 的处理 |
-| --- | --- |
-| Codex 明明开了 VPN，还是经常卡在重试 | 固定把 Codex 指向本地守护入口，不依赖 App 偶然继承系统代理 |
-| VPN 重启或节点切换后端口变了 | 每 5 秒重新发现可用入口；新连接自动改走新端口 |
-| 你的 VPN 是 Clash、Surge、V2Ray，或者别的客户端 | 识别它暴露的系统 PAC、HTTP、HTTPS CONNECT 或 SOCKS5 本地入口 |
-| VPN 暂停时担心 Codex 悄悄直连 | 默认直接拦住，并告诉你该启动 VPN 还是换节点 |
-| 一直 `5/5` 但不确定是不是网络问题 | `doctor` 区分代理、DNS、TLS、WebSocket、401/403、429、服务端和 Codex 自身故障 |
+## 快速开始
 
-## 三步开始
+### 面向零基础用户
 
-1. 从 [Releases](https://github.com/bei666qi-pan/codex_no5-5/releases) 下载适合你的版本：macOS 下载 `.dmg`，Windows 下载 x64 便携 ZIP。
+1. 从 [GitHub Releases](https://github.com/bei666qi-pan/codex_no5-5/releases) 下载：macOS 使用 `.dmg`，Windows 使用 x64 便携 ZIP。
 2. 打开 **Codex Network Guard**，点击 **「一键检测并启用」**。
-3. 关闭并重新打开一次 Codex。以后 VPN 切换或重启，不需要重启 CNG。
+3. 关闭并重新打开一次 Codex。
 
-完成后，你只需要看应用顶部：
+就这么多。以后 VPN 切换节点、重启或本地端口变化时，不需要重启 CNG。界面右上角可在中文和 English 之间即时切换，并会记住选择。
 
-- **连接受保护**：已经正常工作，放心使用。
-- **需要 VPN**：先启动 VPN，再点「刷新检测」。
-- **连接需要关注**：VPN 能用但不够稳定，建议在 VPN 内换节点后刷新。
-- **Codex 需要处理**：不是网络问题，界面会直接告诉你下一步。
+### 看到状态后怎么做
 
-## 为什么它更稳
+| 状态 | 代表什么 | 下一步 |
+| --- | --- | --- |
+| **连接受保护** | Codex 正通过健康 VPN 路径连接 | 正常使用 |
+| **需要 VPN** | 没有发现可用的本地代理入口 | 启动 VPN，点击「刷新检测」 |
+| **连接需要关注** | 路径可用但近期不稳定 | 在 VPN 内换节点或协议，再刷新 |
+| **Codex 需要处理** | 登录、限流、服务端或 Codex 自身问题 | 按界面建议处理，不必盲目切 VPN |
+
+## 它能解决什么
+
+| 常见问题 | CNG 的处理 |
+| --- | --- |
+| Codex 没有稳定继承代理 | 对 Codex 注入固定本机代理入口，不修改系统全局代理 |
+| VPN 重启、切换节点后端口变化 | 每 5 秒重新发现并选择健康上游；切换只作用于新连接 |
+| HTTP 与 SOCKS5 模式不同 | 统一转为标准 HTTP/HTTPS CONNECT 本地入口 |
+| VPN 不可用时担心直连 | 默认阻止直连回退，并返回可诊断错误 |
+| 不知道 `5/5` 是网络、登录还是限流 | `cng doctor` 分类代理、DNS、TLS、WebSocket、401/403、429、5xx 与 Codex 故障 |
 
 ```mermaid
 flowchart LR
-  A["Codex App / CLI"] --> B["CNG 固定本机入口\n127.0.0.1:17890"]
-  B --> C{"自动选择健康 VPN 入口"}
+  A["Codex App / CLI"] --> B["CNG 本机入口\n127.0.0.1:17890"]
+  B --> C{"选择健康 VPN 入口"}
   C --> D["系统 PAC / HTTP"]
   C --> E["SOCKS5"]
   C --> F["手动入口"]
@@ -55,91 +68,44 @@ flowchart LR
   F --> G
 ```
 
-它只切换**新连接**，不会为了换线路强行断掉正在正常工作的 WebSocket。它也不会碰你的 VPN 节点、订阅或规则；只使用 VPN 已经在电脑本机暴露的入口。
+## 支持范围
 
-## 支持哪些 VPN
+“兼容各类 VPN”指兼容 VPN 在**本机**暴露的标准代理入口，而不是读取、修改或控制 VPN 的节点、订阅和规则。
 
-不用在意 VPN 软件的名字，关键是它是否提供了本地代理入口。下面这些方式都在自动化测试中覆盖：
-
-| 你的 VPN 设置 | 是否支持 | 你需要做什么 |
+| 暴露方式 | 支持情况 | 自动化验证 |
 | --- | --- | --- |
-| macOS 系统代理 / 自动配置 PAC | 支持 | 保持 VPN 正常开启即可 |
-| Windows 系统代理 / 自动配置 PAC | 支持 | 保持 VPN 正常开启即可 |
-| HTTP 或 HTTPS CONNECT 本地端口 | 支持 | 通常无需填写；检测不到再去「手动设置」粘贴地址 |
-| SOCKS5 / mixed port | 支持 | 通常无需填写；检测不到再去「手动设置」粘贴地址 |
-| Clash Verge Rev、ClashX、Surge、V2RayU 等 | 兼容其提供的以上入口 | 不读取、不修改 VPN 内部配置 |
+| macOS 系统代理与 PAC | 支持 | `scutil` 字段、PAC 路由解析 |
+| Windows 系统代理与 PAC | 支持 | 注册表字段、协议映射 |
+| HTTP 本地端口 | 支持 | CONNECT 隧道、407、端口恢复 |
+| HTTPS CONNECT 本地端口 | 支持 | 候选发现与连接路径 |
+| SOCKS5 / mixed port | 支持 | SOCKS5 握手与远端 DNS |
+| Clash Verge Rev、ClashX、Surge、V2RayU 等 | 兼容上述入口 | 以客户端实际暴露方式为准 |
 
-自动化测试会验证 HTTP CONNECT、SOCKS5 远端 DNS、PAC（`PROXY` / `HTTPS` / `SOCKS`）、macOS/Windows 系统代理解析、407 验证失败、端口切换和禁止直连泄漏。不同客户端的节点质量、订阅规则和复杂动态 PAC 不属于任何工具可以保证的范围；若自动发现不到，直接填写 VPN 的本机 HTTP 或 SOCKS5 地址即可。
+自动化测试还会断言：VPN 停止时目标地址不会收到任何直连流量；VPN 端口变化后，已建立的健康隧道不被强制中断，下一条连接会走新路径。完整矩阵见 [docs/testing.md](docs/testing.md)。复杂的按域名动态 PAC 不执行任意 PAC JavaScript；遇到这种情况，请在应用的「手动设置本地代理」中填写该 VPN 的本机 HTTP 或 SOCKS5 地址。
 
-## 安全边界
+## 安全与隐私
 
-- 只监听 `127.0.0.1:17890`，仅接受本机连接。
-- 不启用 TUN，不修改 macOS 全局代理，不读取或修改 VPN 配置。
-- 不做 TLS 中间人，不读取 Codex 请求正文、对话或账号令牌。
-- 默认禁止直连回退；VPN 不可用时快速返回诊断错误，避免流量静默绕过 VPN。
-- 手动上游包含账号密码时只写入 macOS Keychain。
-- RPC 使用权限为 `0600` 的 Unix Socket；日志保留 7 天且总量最多 20 MB。
+- 仅监听 `127.0.0.1:17890`，只接受本机连接。
+- 不启用 TUN，不修改系统全局代理，不读取或修改 VPN 配置。
+- 不做 TLS 中间人，不读取 Codex 对话、代码、账号令牌或请求正文。
+- 默认禁止直连回退；VPN 不可用时快速报错。
+- macOS 手动上游包含凭据时存入 Keychain；诊断日志会脱敏，保留最多 7 天和 20 MB。
 
 ## 常见问题
 
-### 我看到“需要 VPN”，怎么办？
+### 自动检测不到 VPN，怎么办？
 
-先启动 VPN，再点击「刷新检测」。如果仍然没有成功，展开应用中的「手动设置本地代理」，填入 VPN 软件显示的本机地址，例如 `http://127.0.0.1:7890` 或 `socks5h://127.0.0.1:7891`。**不要**填写机场订阅链接。
+展开应用中的「手动设置本地代理」，填写 VPN 软件显示的本机地址，例如 `http://127.0.0.1:7890` 或 `socks5h://127.0.0.1:7891`。不要填写机场订阅链接。填写后 CNG 会先测试再使用；选择「恢复自动选择」即可回到默认模式。
 
-### 我看到“Codex 需要处理”，是不是 VPN 坏了？
+### CNG 能保证永远不出现 `5/5` 吗？
 
-不是。它表示网络路径正常，问题可能是登录、账户权限、429 限流、服务端繁忙或 Codex 自身状态。按界面给出的操作处理即可，不需要反复切换 VPN。
+不能诚实地这样承诺。它会解决代理继承、端口变化、HTTP/SOCKS 不兼容和路由失败等网络问题；但登录失效、账户权限、429 限流、服务端异常或 Codex 本身故障也可能触发相似重试。请使用「查看诊断详情」或 `cng doctor` 确认类别。
 
-### 还会不会出现 `5/5`？
+### 支持手机远程吗？
 
-CNG 会解决 Codex 没有稳定继承 VPN、端口变化、HTTP/SOCKS 不兼容和网络路由失败等问题；但 `5/5` 也可能来自登录、限流或服务端，因此它不能诚实地承诺消除所有重试。遇到问题时，点击「查看诊断详情」或运行 `cng doctor`，结果会直接标出类别。
+支持电脑端的远程控制保活。它只保证电脑上的 Codex 进程通过固定代理运行；手机自身仍需能够访问官方服务。
 
-### 我担心隐私和流量泄漏。
-
-CNG 只监听本机 `127.0.0.1:17890`，不启用 TUN、不改系统全局代理、不解密 HTTPS，也不读取 Codex 对话、代码、账号令牌或 VPN 配置。VPN 不可用时默认阻止直连，避免流量静默绕过 VPN。导出诊断不包含代理密码、对话或令牌。
-
-## 安装
-
-### 面向普通用户
-
-macOS 请从 GitHub Releases 下载通用 `.dmg`（同时支持 Apple Silicon 和 Intel）；Windows 请下载 x64 便携 ZIP 并运行 `cng-desktop.exe`。打开菜单栏应用后点击“一键检测并启用”，完成检测 Codex、检测 VPN、连接测试和登录自启。首次只需重新打开一次 Codex。
-
-当前仓库版本是开发构建；没有 Developer ID 签名和公证的产物会明确标记为 `development`。正式面向新手发布前应配置签名、公证和更新签名。
-
-### 从源码运行
-
-要求 macOS 13+ 和 Rust stable：
-
-```bash
-brew install rust
-cargo build --workspace
-cargo test --workspace
-./target/debug/cng service install
-```
-
-安装成功后关闭并重新打开一次 Codex。菜单栏界面可用以下命令启动：
-
-```bash
-cargo run -p cng-desktop
-```
-
-安装只复制 `cng`、`cngd` 和 `cng-codex` 到用户的 Application Support 目录，并创建自己的 LaunchAgent。不会修改 `~/.codex/config.toml`。卸载：
-
-```bash
-cng service uninstall
-```
-
-如果你希望终端里直接输入 `codex` 也自动经过保护，可选执行：
-
-```bash
-cng service terminal-enable
-# 恢复：
-cng service terminal-disable
-```
-
-这只在 `~/.zprofile` 中添加带明确边界的 PATH 管理块，卸载时也会移除。
-
-## CLI
+## CLI 与高级使用
 
 ```text
 cng status [--json]
@@ -155,8 +121,6 @@ cng service migrate-legacy
 cng service terminal-enable|terminal-disable
 ```
 
-示例：
-
 ```bash
 cng status
 cng upstream set socks5h://127.0.0.1:7891
@@ -164,52 +128,38 @@ cng doctor --export ~/Desktop/cng-diagnostic.json
 cng codex -- --version
 ```
 
-`doctor` 的导出内容会脱敏代理凭据和用户主目录。分享前仍建议人工浏览一次。
+`doctor` 会脱敏代理凭据和用户目录；在分享诊断文件前，仍建议人工浏览一次。启用 `terminal-enable` 时，CNG 只在 `~/.zprofile` 添加带明确边界的 PATH 管理块，可用 `terminal-disable` 完整移除。
 
-非 JSON 的 `cng status` 还会显示守护进程判断出的“下一步”；脚本和其他客户端可继续使用稳定的 `--json` 输出，新增字段不会破坏既有消费者。
+## 开发、测试与发布
 
-## 旧版原型迁移
+### 从源码运行
 
-检测到 `com.openai.codex-proxy-guard` 时，`cng` 只提示，不会自动修改。先安装并确认新守护进程正常，再明确执行：
+要求 macOS 13+ 与 Rust stable：
 
 ```bash
-cng service migrate-legacy
+brew install rust
+cargo build --workspace
+cargo test --workspace
+./target/debug/cng service install
 ```
 
-该命令先备份旧 LaunchAgent 和已知脚本，再停用旧服务；不会删除旧文件，也不会触碰不属于本项目的代理配置。
-
-## 支持范围与限制
-
-- macOS 13+：完整桌面端、LaunchAgent、Keychain 手动凭据和通用架构 DMG。
-- Windows 10/11 x64：完整桌面端、命名管道控制接口、任务计划程序登录自启、系统显式代理/PAC 发现，以及便携 ZIP。首次启用后需重新打开一次 Codex。
-- Windows 手动上游暂只支持无凭据的 HTTP/HTTPS/SOCKS5 URL；带凭据上游请由 VPN 客户端提供本地无凭据入口。
-- “兼容各类 VPN”指兼容 VPN 暴露的系统 PAC、HTTP 或 SOCKS5 本地入口；不控制 VPN 节点。
-- 如果 VPN 只有一个入口且节点本身质量差，工具只能诊断并建议在 VPN 内换节点。
-- 手机远程保活只保证电脑端 Codex 远程进程通过固定代理运行；手机仍需能访问官方服务。
-- PAC v1 从脚本中提取明确的 `PROXY`/`HTTPS`/`SOCKS` 路由，不执行任意 PAC JavaScript。复杂的按域名动态 PAC 应手动指定其本地代理入口。
-- Windows 发布物是 x64 便携 ZIP，需 Windows WebView2 Runtime（Windows 10/11 通常已自带）。正式 NSIS/MSI 安装器和代码签名将在后续发布中提供。
-
-## 开发
-
-详细架构和测试矩阵见 [docs/architecture.md](docs/architecture.md) 与 [docs/testing.md](docs/testing.md)。贡献前运行：
+启动桌面应用：
 
 ```bash
+cargo run -p cng-desktop
+```
+
+### 贡献前检查
+
+```bash
+node --test apps/desktop/ui/ui.test.js
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-构建通用架构 DMG 需要 `rustup`、两个 macOS target 和 Tauri CLI：
+架构与测试矩阵分别位于 [docs/architecture.md](docs/architecture.md) 和 [docs/testing.md](docs/testing.md)。构建 macOS 通用 DMG 使用 `./scripts/build-macos-universal.sh`；构建 Windows 便携 ZIP 使用 `./scripts/build-windows-portable.ps1`。
 
-```bash
-cargo install tauri-cli --version '^2' --locked
-./scripts/build-macos-universal.sh
-```
+## 许可证与安全
 
-构建 Windows 便携 ZIP：
-
-```powershell
-./scripts/build-windows-portable.ps1
-```
-
-许可证：[Apache-2.0](LICENSE)。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。
+本项目使用 [Apache-2.0](LICENSE)。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。

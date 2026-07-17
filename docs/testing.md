@@ -23,7 +23,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
 
-The UI suite verifies the status-led hierarchy contract: healthy routes stay calm, VPN failures expose a recovery CTA, non-network failures keep their Codex action, the branded asset is present, and the rendered surface retains all functional control IDs. It runs in CI on macOS and Windows without browser-test dependencies.
+The UI suite verifies the status-led hierarchy contract: healthy routes stay calm, VPN failures expose a recovery CTA, non-network failures keep their Codex action, Chinese and English status guidance resolve correctly, the branded asset is present, and the rendered surface retains all functional control IDs. It runs in CI on macOS and Windows without browser-test dependencies.
 
 ## Automated VPN interface matrix
 
