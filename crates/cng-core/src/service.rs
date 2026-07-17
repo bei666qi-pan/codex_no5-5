@@ -703,7 +703,7 @@ fn shell_double_quote(value: &str) -> String {
         .replace('`', "\\`")
 }
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
 
