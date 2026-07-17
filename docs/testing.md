@@ -34,6 +34,13 @@ Before a public beta, exercise both Apple Silicon and Intel on macOS 13 or newer
 
 Also verify current and previous Codex versions, App and CLI launch, missing `doctor`, missing `respect_system_proxy`, and missing `remote-control` degradation.
 
+On Windows 10/11 x64, verify the following in both a standard user account and a non-English display language:
+
+- Explicit Windows Internet Settings HTTP proxy, SOCKS entry and AutoConfigURL PAC.
+- VPN port change and restart recovery without restarting the guard.
+- Task Scheduler creation, login restart, uninstall restoration of `CODEX_CLI_PATH`, and absence of a global WinHTTP proxy change.
+- Desktop, CLI, named-pipe `status --json`, remote-control feature fallback, and a portable ZIP launch with WebView2.
+
 ## Release gates
 
 - First-time setup within two minutes and at most three clicks.

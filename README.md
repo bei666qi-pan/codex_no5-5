@@ -118,12 +118,14 @@ cng service migrate-legacy
 
 ## 支持范围与限制
 
-- v1：macOS 13+，Codex App 和 CLI，HTTP/HTTPS CONNECT/SOCKS5 上游。
+- macOS 13+：完整桌面端、LaunchAgent、Keychain 手动凭据和通用架构 DMG。
+- Windows 10/11 x64：完整桌面端、命名管道控制接口、任务计划程序登录自启、系统显式代理/PAC 发现，以及便携 ZIP。首次启用后需重新打开一次 Codex。
+- Windows 手动上游暂只支持无凭据的 HTTP/HTTPS/SOCKS5 URL；带凭据上游请由 VPN 客户端提供本地无凭据入口。
 - “兼容各类 VPN”指兼容 VPN 暴露的系统 PAC、HTTP 或 SOCKS5 本地入口；不控制 VPN 节点。
 - 如果 VPN 只有一个入口且节点本身质量差，工具只能诊断并建议在 VPN 内换节点。
 - 手机远程保活只保证电脑端 Codex 远程进程通过固定代理运行；手机仍需能访问官方服务。
 - PAC v1 从脚本中提取明确的 `PROXY`/`HTTPS`/`SOCKS` 路由，不执行任意 PAC JavaScript。复杂的按域名动态 PAC 应手动指定其本地代理入口。
-- Windows 核心适配在后续版本；当前服务管理和 Keychain 实现仅支持 macOS。
+- Windows 发布物是 x64 便携 ZIP，需 Windows WebView2 Runtime（Windows 10/11 通常已自带）。正式 NSIS/MSI 安装器和代码签名将在后续发布中提供。
 
 ## 开发
 
@@ -140,6 +142,12 @@ cargo test --workspace
 ```bash
 cargo install tauri-cli --version '^2' --locked
 ./scripts/build-macos-universal.sh
+```
+
+构建 Windows 便携 ZIP：
+
+```powershell
+./scripts/build-windows-portable.ps1
 ```
 
 许可证：[Apache-2.0](LICENSE)。安全问题请按 [SECURITY.md](SECURITY.md) 私下报告。

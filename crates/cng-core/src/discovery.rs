@@ -33,6 +33,8 @@ pub async fn discover(config: &GuardConfig) -> Result<Vec<UpstreamCandidate>> {
 
     #[cfg(target_os = "macos")]
     candidates.extend(discover_macos_system_proxy().await.unwrap_or_default());
+    #[cfg(target_os = "windows")]
+    candidates.extend(discover_windows_system_proxy().await.unwrap_or_default());
     candidates.extend(discover_environment());
     candidates.extend(common_loopback_candidates());
     Ok(deduplicate(candidates))
@@ -130,7 +132,7 @@ fn parse_scutil_fields(text: &str) -> HashMap<String, String> {
     fields
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "windows"))]
 async fn discover_pac(pac_url: &str) -> Result<Vec<UpstreamCandidate>> {
     let client = reqwest::Client::builder()
         .no_proxy()
@@ -147,6 +149,72 @@ async fn discover_pac(pac_url: &str) -> Result<Vec<UpstreamCandidate>> {
         .text()
         .await?;
     Ok(parse_pac_candidates(&script))
+}
+
+#[cfg(target_os = "windows")]
+async fn discover_windows_system_proxy() -> Result<Vec<UpstreamCandidate>> {
+    let output = Command::new("reg")
+        .args([
+            "query",
+            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings",
+        ])
+        .stdin(Stdio::null())
+        .output()
+        .await
+        .context("query Windows Internet Settings proxy configuration")?;
+    if !output.status.success() {
+        return Ok(Vec::new());
+    }
+    let fields = parse_windows_registry_values(&String::from_utf8_lossy(&output.stdout));
+    let mut candidates = Vec::new();
+    if let Some(pac_url) = fields.get("AutoConfigURL") {
+        candidates.extend(discover_pac(pac_url).await.unwrap_or_default());
+    }
+    let explicit_enabled = fields
+        .get("ProxyEnable")
+        .is_some_and(|value| matches!(value.trim(), "1" | "0x1"));
+    if explicit_enabled && let Some(proxy) = fields.get("ProxyServer") {
+        candidates.extend(parse_windows_proxy_server(proxy));
+    }
+    Ok(candidates)
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn parse_windows_registry_values(text: &str) -> HashMap<String, String> {
+    let pattern = Regex::new(r"(?m)^\s*([^\s]+)\s+REG_[A-Z_]+\s+(.+?)\s*$")
+        .expect("valid Windows registry regex");
+    pattern
+        .captures_iter(text)
+        .map(|capture| (capture[1].to_string(), capture[2].to_string()))
+        .collect()
+}
+
+#[cfg(any(target_os = "windows", test))]
+fn parse_windows_proxy_server(value: &str) -> Vec<UpstreamCandidate> {
+    let mut candidates = Vec::new();
+    for segment in value
+        .split(';')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        let (kind, endpoint) = segment
+            .split_once('=')
+            .map_or(("http", segment), |(kind, endpoint)| {
+                (kind, endpoint.trim())
+            });
+        let scheme = match kind.trim().to_ascii_lowercase().as_str() {
+            "socks" | "socks4" | "socks5" => "socks5h",
+            "https" => "https",
+            _ => "http",
+        };
+        add_url(
+            &mut candidates,
+            &format!("{scheme}://{endpoint}"),
+            CandidateSource::SystemProxy,
+            format!("Windows system proxy {endpoint}"),
+        );
+    }
+    deduplicate(candidates)
 }
 
 pub fn parse_pac_candidates(script: &str) -> Vec<UpstreamCandidate> {
@@ -297,5 +365,17 @@ mod tests {
             "loop",
         );
         assert!(values.is_empty());
+    }
+
+    #[test]
+    fn parses_windows_proxy_settings() {
+        let fields = parse_windows_registry_values(
+            "    ProxyEnable    REG_DWORD    0x1\n    ProxyServer    REG_SZ    http=127.0.0.1:7890;socks=127.0.0.1:7891\n",
+        );
+        assert_eq!(fields.get("ProxyEnable"), Some(&"0x1".to_string()));
+        let values = parse_windows_proxy_server(fields.get("ProxyServer").unwrap());
+        assert_eq!(values.len(), 2);
+        assert_eq!(values[0].url.scheme(), "http");
+        assert_eq!(values[1].url.scheme(), "socks5h");
     }
 }

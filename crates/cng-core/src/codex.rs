@@ -9,11 +9,19 @@ use tokio::process::{Child, Command};
 
 use crate::config::{DEFAULT_LISTEN_PORT, GuardConfig};
 
+#[cfg(not(target_os = "windows"))]
 const COMMON_CODEX_PATHS: &[&str] = &[
     "/Applications/ChatGPT.app/Contents/Resources/codex",
     "/Applications/Codex.app/Contents/Resources/codex",
     "/opt/homebrew/bin/codex",
     "/usr/local/bin/codex",
+];
+
+#[cfg(target_os = "windows")]
+const COMMON_CODEX_PATHS: &[&str] = &[
+    r"C:\Program Files\Codex\codex.exe",
+    r"C:\Program Files\OpenAI\Codex\codex.exe",
+    r"C:\Program Files\ChatGPT\codex.exe",
 ];
 
 pub fn find_real_codex(config: Option<&GuardConfig>) -> Option<PathBuf> {
@@ -33,6 +41,21 @@ pub fn find_real_codex(config: Option<&GuardConfig>) -> Option<PathBuf> {
             return Some(path);
         }
     }
+    #[cfg(target_os = "windows")]
+    if let Some(path) = std::env::var_os("LOCALAPPDATA").and_then(|base| {
+        [
+            PathBuf::from(&base).join(r"Programs\Codex\codex.exe"),
+            PathBuf::from(&base).join(r"Programs\ChatGPT\codex.exe"),
+            PathBuf::from(&base).join(r"OpenAI\Codex\codex.exe"),
+        ]
+        .into_iter()
+        .find(|path| is_real_codex(path))
+    }) {
+        return Some(path);
+    }
+    #[cfg(target_os = "windows")]
+    return find_on_path("codex.exe").or_else(|| find_on_path("codex"));
+    #[cfg(not(target_os = "windows"))]
     find_on_path("codex")
 }
 

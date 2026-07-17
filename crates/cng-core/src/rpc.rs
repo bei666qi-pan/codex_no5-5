@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncRead, AsyncWrite, AsyncWriteExt, BufReader};
 
 pub const RPC_API_VERSION: u32 = 1;
 
@@ -59,34 +59,61 @@ pub async fn run_server(path: &Path, handler: Arc<dyn RpcHandler>) -> Result<()>
         let (stream, _) = listener.accept().await?;
         let handler = Arc::clone(&handler);
         tokio::spawn(async move {
-            let (reader, mut writer) = stream.into_split();
-            let mut reader = BufReader::new(reader);
-            let mut line = String::new();
-            loop {
-                line.clear();
-                let count = match reader.read_line(&mut line).await {
-                    Ok(count) => count,
-                    Err(_) => return,
-                };
-                if count == 0 {
-                    return;
-                }
-                let response = process_line(&line, handler.as_ref()).await;
-                let Ok(mut encoded) = serde_json::to_vec(&response) else {
-                    return;
-                };
-                encoded.push(b'\n');
-                if writer.write_all(&encoded).await.is_err() {
-                    return;
-                }
-            }
+            serve_stream(stream, handler).await;
         });
     }
 }
 
-#[cfg(not(unix))]
+#[cfg(target_os = "windows")]
+pub async fn run_server(path: &Path, handler: Arc<dyn RpcHandler>) -> Result<()> {
+    use tokio::net::windows::named_pipe::ServerOptions;
+
+    let pipe_name = path.to_string_lossy().to_string();
+    loop {
+        let server = ServerOptions::new()
+            .create(path.as_os_str())
+            .with_context(|| format!("create RPC named pipe {pipe_name}"))?;
+        server
+            .connect()
+            .await
+            .with_context(|| format!("accept RPC named-pipe client {pipe_name}"))?;
+        let handler = Arc::clone(&handler);
+        tokio::spawn(async move {
+            serve_stream(server, handler).await;
+        });
+    }
+}
+
+#[cfg(all(not(unix), not(target_os = "windows")))]
 pub async fn run_server(_path: &Path, _handler: Arc<dyn RpcHandler>) -> Result<()> {
     anyhow::bail!("local RPC transport is not implemented on this platform")
+}
+
+async fn serve_stream<S>(stream: S, handler: Arc<dyn RpcHandler>)
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    let (reader, mut writer) = tokio::io::split(stream);
+    let mut reader = BufReader::new(reader);
+    let mut line = String::new();
+    loop {
+        line.clear();
+        let count = match reader.read_line(&mut line).await {
+            Ok(count) => count,
+            Err(_) => return,
+        };
+        if count == 0 {
+            return;
+        }
+        let response = process_line(&line, handler.as_ref()).await;
+        let Ok(mut encoded) = serde_json::to_vec(&response) else {
+            return;
+        };
+        encoded.push(b'\n');
+        if writer.write_all(&encoded).await.is_err() {
+            return;
+        }
+    }
 }
 
 async fn process_line(line: &str, handler: &dyn RpcHandler) -> RpcResponse {
@@ -144,7 +171,25 @@ pub async fn call(path: &Path, method: &str, params: Value) -> Result<Value> {
     let stream = UnixStream::connect(path)
         .await
         .with_context(|| format!("connect to daemon at {}", path.display()))?;
-    let (reader, mut writer) = stream.into_split();
+    call_stream(stream, method, params).await
+}
+
+#[cfg(target_os = "windows")]
+pub async fn call(path: &Path, method: &str, params: Value) -> Result<Value> {
+    use tokio::net::windows::named_pipe::ClientOptions;
+
+    let pipe_name = path.to_string_lossy();
+    let stream = ClientOptions::new()
+        .open(path.as_os_str())
+        .with_context(|| format!("connect to daemon named pipe {pipe_name}"))?;
+    call_stream(stream, method, params).await
+}
+
+async fn call_stream<S>(stream: S, method: &str, params: Value) -> Result<Value>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
+    let (reader, mut writer) = tokio::io::split(stream);
     let request = RpcRequest {
         version: RPC_API_VERSION,
         id: 1,
@@ -166,7 +211,7 @@ pub async fn call(path: &Path, method: &str, params: Value) -> Result<Value> {
         .context("daemon response did not include a result")
 }
 
-#[cfg(not(unix))]
+#[cfg(all(not(unix), not(target_os = "windows")))]
 pub async fn call(_path: &Path, _method: &str, _params: Value) -> Result<Value> {
     anyhow::bail!("local RPC transport is not implemented on this platform")
 }

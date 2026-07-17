@@ -91,12 +91,22 @@ async fn onboarding_probe() -> Result<Value, String> {
 
 #[tauri::command]
 async fn open_codex() -> Result<(), String> {
+    #[cfg(target_os = "macos")]
     let status = tokio::process::Command::new("/usr/bin/open")
         .args(["-b", "com.openai.codex"])
         .stdin(Stdio::null())
         .status()
         .await
         .map_err(|error| error.to_string())?;
+    #[cfg(target_os = "windows")]
+    let status = tokio::process::Command::new("cmd")
+        .args(["/C", "start", "", "codex"])
+        .stdin(Stdio::null())
+        .status()
+        .await
+        .map_err(|error| error.to_string())?;
+    #[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+    return Err("opening Codex from the desktop app is not implemented on this platform".into());
     status
         .success()
         .then_some(())

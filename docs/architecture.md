@@ -14,7 +14,7 @@
 
 The relay is deliberately a raw tunnel rather than a TLS-terminating proxy. For `CONNECT`, it establishes the selected HTTP/HTTPS/SOCKS5 upstream tunnel, returns `200 Connection Established`, then copies bytes bidirectionally. For absolute-form plain HTTP, it strips proxy-only headers and forwards origin-form requests through the same tunnel.
 
-The control plane is JSON-lines RPC v1 over a per-user Unix Socket. The containing directory is `0700` and the socket is `0600`. Public enums use snake-case serialized names. v1 additions must use optional/defaultable fields; existing fields and meanings must not be removed or changed.
+The control plane is JSON-lines RPC v1 over a per-user Unix Socket on macOS and a local Windows named pipe on Windows. The Unix Socket containing directory is `0700` and the socket is `0600`; the Windows pipe is not a network listener. Public enums use snake-case serialized names. v1 additions must use optional/defaultable fields; existing fields and meanings must not be removed or changed.
 
 ## Candidate selection
 
@@ -32,6 +32,6 @@ The guard records operational metadata only. It never terminates destination TLS
 
 ## macOS integration
 
-The LaunchAgent owns only `dev.codex-network-guard.daemon`. Installation stores the previous GUI-session `CODEX_CLI_PATH`, points it at `cng-codex`, and restores the prior value only if it still equals the guard wrapper during uninstall. This prevents overwriting a later user change.
+On macOS, the LaunchAgent owns only `dev.codex-network-guard.daemon`. On Windows, a per-user Task Scheduler task named `CodexNetworkGuard` owns only `cngd.exe`; administrator rights are not required. Installation stores the previous `CODEX_CLI_PATH`, points it at `cng-codex`, and restores the prior value only if it still equals the guard wrapper during uninstall. This prevents overwriting a later user change.
 
 Terminal integration is opt-in and consists of one removable block in `~/.zprofile`. Legacy migration is also opt-in: the new service must already be installed and running before the old plist is backed up and booted out.

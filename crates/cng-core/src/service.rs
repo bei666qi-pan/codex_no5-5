@@ -9,6 +9,8 @@ use crate::config::{app_support_dir, installed_bin_dir, log_dir};
 
 pub const SERVICE_LABEL: &str = "dev.codex-network-guard.daemon";
 pub const LEGACY_SERVICE_LABEL: &str = "com.openai.codex-proxy-guard";
+#[cfg(target_os = "windows")]
+pub const WINDOWS_TASK_NAME: &str = "CodexNetworkGuard";
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct ServiceStatus {
@@ -40,9 +42,14 @@ pub fn launch_agent_path() -> Result<PathBuf> {
         .join(format!("Library/LaunchAgents/{SERVICE_LABEL}.plist")))
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
 pub fn launch_agent_path() -> Result<PathBuf> {
-    anyhow::bail!("service management is currently implemented only on macOS")
+    Ok(app_support_dir()?.join(format!("{WINDOWS_TASK_NAME}.task")))
+}
+
+#[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+pub fn launch_agent_path() -> Result<PathBuf> {
+    anyhow::bail!("service management is currently implemented only on macOS and Windows")
 }
 
 #[cfg(target_os = "macos")]
@@ -68,9 +75,35 @@ pub async fn status() -> Result<ServiceStatus> {
     })
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
 pub async fn status() -> Result<ServiceStatus> {
-    anyhow::bail!("service management is currently implemented only on macOS")
+    let output = Command::new("schtasks")
+        .args(["/query", "/tn", WINDOWS_TASK_NAME])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .output()
+        .await?;
+    let installed = output.status.success();
+    let running = installed
+        && crate::rpc::call(
+            &crate::config::rpc_socket_path()?,
+            "status",
+            serde_json::Value::Null,
+        )
+        .await
+        .is_ok();
+    Ok(ServiceStatus {
+        installed,
+        running,
+        legacy_guard_detected: false,
+        launch_agent: format!("Task Scheduler\\{WINDOWS_TASK_NAME}"),
+    })
+}
+
+#[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+pub async fn status() -> Result<ServiceStatus> {
+    anyhow::bail!("service management is currently implemented only on macOS and Windows")
 }
 
 #[cfg(target_os = "macos")]
@@ -147,9 +180,79 @@ pub async fn install() -> Result<ServiceStatus> {
     anyhow::bail!("daemon did not become healthy within six seconds; installation was rolled back")
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
 pub async fn install() -> Result<ServiceStatus> {
-    anyhow::bail!("service management is currently implemented only on macOS")
+    let executable = std::env::current_exe()?;
+    let source_dir = executable
+        .parent()
+        .context("cannot locate CNG installation directory")?;
+    let cli_source = source_dir.join("cng.exe");
+    let daemon_source = source_dir.join("cngd.exe");
+    let wrapper_source = source_dir.join("cng-codex.exe");
+    anyhow::ensure!(
+        cli_source.is_file(),
+        "cng.exe must be next to the installer"
+    );
+    anyhow::ensure!(daemon_source.is_file(), "cngd.exe must be next to cng.exe");
+    anyhow::ensure!(
+        wrapper_source.is_file(),
+        "cng-codex.exe must be next to cng.exe"
+    );
+
+    let bin_dir = installed_bin_dir()?;
+    crate::config::ensure_private_dir(&bin_dir)?;
+    let daemon = bin_dir.join("cngd.exe");
+    let wrapper = bin_dir.join("cng-codex.exe");
+    let cli = bin_dir.join("cng.exe");
+    copy_executable(&daemon_source, &daemon)?;
+    copy_executable(&wrapper_source, &wrapper)?;
+    copy_executable(&cli_source, &cli)?;
+    fs::create_dir_all(log_dir()?)?;
+
+    save_previous_environment_windows(&wrapper).await?;
+    let task_command = format!("\"{}\"", daemon.display());
+    let status = Command::new("schtasks")
+        .args([
+            "/create",
+            "/tn",
+            WINDOWS_TASK_NAME,
+            "/sc",
+            "onlogon",
+            "/rl",
+            "limited",
+            "/tr",
+            &task_command,
+            "/f",
+        ])
+        .status()
+        .await?;
+    anyhow::ensure!(status.success(), "could not create the CNG logon task");
+    if let Err(error) = set_windows_user_environment(&wrapper).await {
+        let _ = uninstall().await;
+        return Err(error);
+    }
+    let status = Command::new("schtasks")
+        .args(["/run", "/tn", WINDOWS_TASK_NAME])
+        .status()
+        .await?;
+    if !status.success() {
+        let _ = uninstall().await;
+        anyhow::bail!("could not start the CNG logon task");
+    }
+    for _ in 0..24 {
+        let service = self::status().await?;
+        if service.running {
+            return Ok(service);
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+    }
+    let _ = uninstall().await;
+    anyhow::bail!("daemon did not become healthy within six seconds; installation was rolled back")
+}
+
+#[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+pub async fn install() -> Result<ServiceStatus> {
+    anyhow::bail!("service management is currently implemented only on macOS and Windows")
 }
 
 #[cfg(target_os = "macos")]
@@ -185,9 +288,32 @@ pub async fn uninstall() -> Result<ServiceStatus> {
     self::status().await
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
 pub async fn uninstall() -> Result<ServiceStatus> {
-    anyhow::bail!("service management is currently implemented only on macOS")
+    let _ = Command::new("schtasks")
+        .args(["/delete", "/tn", WINDOWS_TASK_NAME, "/f"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await;
+    let expected_wrapper = installed_bin_dir()?.join("cng-codex.exe");
+    let expected_wrapper = expected_wrapper.to_string_lossy().to_string();
+    if read_windows_user_environment().await?.as_deref() == Some(&expected_wrapper) {
+        restore_previous_environment_windows().await?;
+    } else {
+        remove_install_state()?;
+    }
+    let bin_dir = installed_bin_dir()?;
+    if bin_dir.exists() {
+        fs::remove_dir_all(bin_dir).context("remove installed CNG binaries")?;
+    }
+    self::status().await
+}
+
+#[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+pub async fn uninstall() -> Result<ServiceStatus> {
+    anyhow::bail!("service management is currently implemented only on macOS and Windows")
 }
 
 #[cfg(target_os = "macos")]
@@ -202,9 +328,26 @@ pub async fn restart() -> Result<ServiceStatus> {
     self::status().await
 }
 
-#[cfg(not(target_os = "macos"))]
+#[cfg(target_os = "windows")]
 pub async fn restart() -> Result<ServiceStatus> {
-    anyhow::bail!("service management is currently implemented only on macOS")
+    let _ = Command::new("schtasks")
+        .args(["/end", "/tn", WINDOWS_TASK_NAME])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await;
+    let status = Command::new("schtasks")
+        .args(["/run", "/tn", WINDOWS_TASK_NAME])
+        .status()
+        .await?;
+    anyhow::ensure!(status.success(), "could not restart the CNG logon task");
+    self::status().await
+}
+
+#[cfg(all(not(target_os = "macos"), not(target_os = "windows")))]
+pub async fn restart() -> Result<ServiceStatus> {
+    anyhow::bail!("service management is currently implemented only on macOS and Windows")
 }
 
 #[cfg(target_os = "macos")]
@@ -222,6 +365,21 @@ fn copy_executable(source: &Path, destination: &Path) -> Result<()> {
         )
     })?;
     fs::set_permissions(destination, fs::Permissions::from_mode(0o755))?;
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn copy_executable(source: &Path, destination: &Path) -> Result<()> {
+    if source.canonicalize().ok() == destination.canonicalize().ok() && destination.is_file() {
+        return Ok(());
+    }
+    fs::copy(source, destination).with_context(|| {
+        format!(
+            "copy executable from {} to {}",
+            source.display(),
+            destination.display()
+        )
+    })?;
     Ok(())
 }
 
@@ -303,6 +461,103 @@ async fn restore_previous_environment() -> Result<()> {
     anyhow::ensure!(status.success(), "could not restore CODEX_CLI_PATH");
     if state_path.exists() {
         fs::remove_file(state_path)?;
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+async fn save_previous_environment_windows(expected_wrapper: &Path) -> Result<()> {
+    let path = install_state_path()?;
+    if path.exists() {
+        return Ok(());
+    }
+    let previous = read_windows_user_environment().await?;
+    let expected_wrapper = expected_wrapper.to_string_lossy().to_string();
+    let state = InstallState {
+        previous_codex_cli_path: previous.filter(|value| value != &expected_wrapper),
+    };
+    crate::config::write_private(&path, &serde_json::to_vec_pretty(&state)?)
+}
+
+#[cfg(target_os = "windows")]
+async fn read_windows_user_environment() -> Result<Option<String>> {
+    let output = Command::new("reg")
+        .args(["query", r"HKCU\Environment", "/v", "CODEX_CLI_PATH"])
+        .stdin(Stdio::null())
+        .output()
+        .await?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    let value = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .find_map(|line| {
+            line.split_once("REG_SZ")
+                .map(|(_, value)| value.trim().to_string())
+        })
+        .filter(|value| !value.is_empty());
+    Ok(value)
+}
+
+#[cfg(target_os = "windows")]
+async fn set_windows_user_environment(wrapper: &Path) -> Result<()> {
+    let wrapper = wrapper.to_string_lossy().to_string();
+    let status = Command::new("setx")
+        .args(["CODEX_CLI_PATH", &wrapper])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status()
+        .await?;
+    anyhow::ensure!(
+        status.success(),
+        "could not set the Windows CODEX_CLI_PATH user variable"
+    );
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+async fn restore_previous_environment_windows() -> Result<()> {
+    let state_path = install_state_path()?;
+    let state = fs::read(&state_path)
+        .ok()
+        .and_then(|value| serde_json::from_slice::<InstallState>(&value).ok())
+        .unwrap_or_default();
+    let status = if let Some(previous) = state.previous_codex_cli_path {
+        Command::new("setx")
+            .args(["CODEX_CLI_PATH", &previous])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .await?
+    } else {
+        Command::new("reg")
+            .args(["delete", r"HKCU\Environment", "/v", "CODEX_CLI_PATH", "/f"])
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .await?
+    };
+    anyhow::ensure!(
+        status.success(),
+        "could not restore the Windows CODEX_CLI_PATH user variable"
+    );
+    remove_install_state()?;
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
+fn install_state_path() -> Result<PathBuf> {
+    Ok(app_support_dir()?.join("install-state.json"))
+}
+
+#[cfg(target_os = "windows")]
+fn remove_install_state() -> Result<()> {
+    let path = install_state_path()?;
+    if path.exists() {
+        fs::remove_file(path)?;
     }
     Ok(())
 }
