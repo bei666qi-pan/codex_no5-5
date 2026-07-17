@@ -32,7 +32,9 @@ pub struct MigrationReport {
     pub legacy_files_deleted: bool,
 }
 
+#[cfg(target_os = "macos")]
 const TERMINAL_BLOCK_START: &str = "# >>> codex-network-guard >>>";
+#[cfg(target_os = "macos")]
 const TERMINAL_BLOCK_END: &str = "# <<< codex-network-guard <<<";
 
 #[cfg(target_os = "macos")]
@@ -663,6 +665,7 @@ pub fn disable_terminal_path() -> Result<PathBuf> {
     anyhow::bail!("terminal PATH integration is currently implemented only on macOS")
 }
 
+#[cfg(target_os = "macos")]
 fn remove_managed_block(value: &str) -> String {
     let Some(start) = value.find(TERMINAL_BLOCK_START) else {
         return value.to_string();
@@ -691,6 +694,7 @@ fn write_preserving_permissions(path: &Path, content: &[u8]) -> Result<()> {
     Ok(())
 }
 
+#[cfg(target_os = "macos")]
 fn shell_double_quote(value: &str) -> String {
     value
         .replace('\\', "\\\\")
@@ -715,6 +719,7 @@ mod tests {
         assert!(xml.contains(SERVICE_LABEL));
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn removes_only_our_terminal_block() {
         let value =
@@ -722,6 +727,7 @@ mod tests {
         assert_eq!(remove_managed_block(&value), "before\nafter\n");
     }
 
+    #[cfg(target_os = "macos")]
     #[test]
     fn escapes_shell_metacharacters() {
         assert_eq!(shell_double_quote("a$b`c\"d"), "a\\$b\\`c\\\"d");

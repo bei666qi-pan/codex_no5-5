@@ -13,7 +13,9 @@ use crate::model::{CandidateSource, UpstreamCandidate};
 const COMMON_PORTS: &[u16] = &[
     7890, 7891, 7897, 1080, 10808, 10809, 6152, 6153, 20170, 33210,
 ];
+#[cfg(target_os = "macos")]
 const KEYCHAIN_SERVICE: &str = "dev.codex-network-guard.upstream";
+#[cfg(target_os = "macos")]
 const KEYCHAIN_ACCOUNT: &str = "upstream";
 
 pub async fn discover(config: &GuardConfig) -> Result<Vec<UpstreamCandidate>> {

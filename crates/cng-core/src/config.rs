@@ -86,21 +86,25 @@ pub fn config_path() -> Result<PathBuf> {
 pub fn rpc_socket_path() -> Result<PathBuf> {
     #[cfg(target_os = "windows")]
     {
-        return Ok(PathBuf::from(r"\\.\pipe\codex-network-guard-v1"));
+        Ok(PathBuf::from(r"\\.\pipe\codex-network-guard-v1"))
     }
     #[cfg(not(target_os = "windows"))]
-    Ok(app_support_dir()?.join("cng.sock"))
+    {
+        Ok(app_support_dir()?.join("cng.sock"))
+    }
 }
 
 pub fn log_dir() -> Result<PathBuf> {
     #[cfg(target_os = "windows")]
     {
-        return Ok(app_support_dir()?.join("logs"));
+        Ok(app_support_dir()?.join("logs"))
     }
     #[cfg(not(target_os = "windows"))]
-    Ok(dirs::home_dir()
-        .context("cannot determine home directory")?
-        .join("Library/Logs/Codex Network Guard"))
+    {
+        Ok(dirs::home_dir()
+            .context("cannot determine home directory")?
+            .join("Library/Logs/Codex Network Guard"))
+    }
 }
 
 pub fn installed_bin_dir() -> Result<PathBuf> {
