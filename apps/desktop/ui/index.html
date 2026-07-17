@@ -6,83 +6,116 @@
     <title>Codex Network Guard</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
-  <body>
+  <body data-tone="neutral">
     <main>
-      <header>
-        <div class="brand-mark">CNG</div>
-        <div>
-          <p class="eyebrow">非官方开源项目</p>
-          <h1>Codex Network Guard</h1>
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark" aria-hidden="true">C</div>
+          <div>
+            <p class="eyebrow">CODEX NETWORK GUARD</p>
+            <h1>连接守护</h1>
+          </div>
         </div>
+        <span class="local-chip"><span></span>本机守护</span>
       </header>
 
-      <section class="hero" aria-live="polite">
-        <span id="status-dot" class="dot unknown"></span>
-        <div>
+      <section id="status-card" class="status-card" aria-live="polite">
+        <div class="status-copy">
+          <div class="status-kicker"><span id="status-dot" class="dot unknown"></span><span id="status-badge">正在检查</span></div>
           <h2 id="status-title">正在检测连接…</h2>
           <p id="status-detail">正在连接本地守护进程</p>
+          <button id="hero-action" class="button primary hidden"></button>
+        </div>
+        <div class="status-illustration" aria-hidden="true">
+          <div class="orbit orbit-one"></div>
+          <div class="orbit orbit-two"></div>
+          <div class="shield">✓</div>
         </div>
       </section>
 
-      <section id="onboarding" class="onboarding hidden">
-        <p class="eyebrow">首次启用</p>
-        <h3>让 Codex 固定走当前 VPN</h3>
-        <ol>
-          <li id="step-codex">检测 Codex</li>
-          <li id="step-vpn">检测 VPN 代理并测试连接</li>
-          <li id="step-service">安装登录自启守护进程</li>
+      <section id="onboarding" class="onboarding hidden" aria-labelledby="onboarding-title">
+        <div>
+          <p class="section-eyebrow">首次启用</p>
+          <h3 id="onboarding-title">让 Codex 固定通过当前 VPN</h3>
+          <p>只需完成一次检测和登录自启；不会修改系统代理或 VPN 配置。</p>
+        </div>
+        <ol class="setup-steps">
+          <li id="step-codex">找到 Codex</li>
+          <li id="step-vpn">验证 VPN 连接</li>
+          <li id="step-service">启用登录自启</li>
         </ol>
-        <button id="install" class="primary">一键检测并启用</button>
-        <p id="restart-tip" class="hidden">已启用。请关闭并重新打开一次 Codex，之后无需重复操作。</p>
-        <button id="migrate-legacy" class="quiet hidden">备份并停用旧版 Guard</button>
+        <button id="install" class="button primary wide">一键检测并启用</button>
+        <p id="restart-tip" class="success-tip hidden">已启用。关闭并重新打开一次 Codex，之后无需重复操作。</p>
+        <button id="migrate-legacy" class="text-button hidden">备份并停用旧版 Guard</button>
       </section>
 
-      <section class="facts">
-        <article><span>本地入口</span><strong id="relay">—</strong></article>
-        <article><span>当前上游</span><strong id="upstream">—</strong></article>
-        <article><span>连接延迟</span><strong id="latency">—</strong></article>
-        <article><span>手机远程</span><strong id="remote">—</strong></article>
+      <section class="overview" aria-labelledby="overview-title">
+        <div class="section-heading">
+          <div>
+            <p class="section-eyebrow">连接概览</p>
+            <h3 id="overview-title">当前保护路径</h3>
+          </div>
+          <span id="upstream-source" class="source-chip">—</span>
+        </div>
+        <div class="facts">
+          <article><span>当前上游</span><strong id="upstream">正在检测</strong></article>
+          <article><span>本地入口</span><strong id="relay">—</strong></article>
+          <article><span>检测延迟</span><strong id="latency">—</strong></article>
+          <article><span>电脑端远程保活</span><strong id="remote">—</strong></article>
+        </div>
       </section>
 
-      <section id="diagnostic" class="notice hidden">
-        <strong id="diagnostic-class">最近诊断</strong>
-        <p id="diagnostic-message"></p>
-        <button id="diagnostic-action" class="notice-action hidden"></button>
+      <section id="diagnostic" class="notice hidden" aria-live="polite">
+        <div class="notice-icon">!</div>
+        <div>
+          <strong id="diagnostic-class">下一步</strong>
+          <p id="diagnostic-message"></p>
+          <button id="diagnostic-action" class="text-button hidden"></button>
+        </div>
       </section>
 
-      <section class="actions">
-        <button id="refresh" class="primary">重新检测</button>
-        <button id="open-codex">打开 Codex</button>
-        <button id="remote-start">开启手机远程</button>
-        <button id="remote-pair">生成配对码</button>
-        <button id="doctor">查看诊断</button>
-        <button id="export-diagnostic">导出脱敏诊断</button>
-        <button id="pause" class="quiet">暂停保护</button>
+      <section class="quick-actions" aria-label="常用操作">
+        <button id="open-codex" class="button primary">打开 Codex</button>
+        <button id="refresh" class="button secondary">刷新检测</button>
       </section>
+
+      <details class="tool-drawer">
+        <summary><span>更多工具</span><small>远程、诊断与保护控制</small></summary>
+        <div class="tool-grid">
+          <button id="remote-start" class="button quiet">启用电脑端远程保活</button>
+          <button id="remote-pair" class="button quiet">生成手机配对码</button>
+          <button id="doctor" class="button quiet">查看诊断详情</button>
+          <button id="export-diagnostic" class="button quiet">导出脱敏诊断</button>
+          <button id="pause" class="button danger-quiet">暂停保护</button>
+        </div>
+      </details>
 
       <details class="advanced">
-        <summary>高级：自动检测不到 VPN 时，手动填写本地代理</summary>
-        <p>仅填写 VPN 软件在本机暴露的地址，例如 <code>http://127.0.0.1:7890</code> 或 <code>socks5h://127.0.0.1:7891</code>。</p>
-        <form id="upstream-form">
-          <input id="upstream-input" type="text" autocomplete="off" placeholder="http://127.0.0.1:7890" />
-          <button type="submit">测试并使用</button>
-          <button id="upstream-auto" type="button" class="quiet">恢复自动选择</button>
-        </form>
+        <summary><span>手动设置本地代理</span><small>自动检测不到 VPN 时使用</small></summary>
+        <div class="details-content">
+          <p>只填写 VPN 软件在本机暴露的 HTTP 或 SOCKS5 地址，不填写机场订阅链接。</p>
+          <form id="upstream-form">
+            <label class="sr-only" for="upstream-input">本地代理地址</label>
+            <input id="upstream-input" type="text" autocomplete="off" placeholder="http://127.0.0.1:7890" />
+            <button type="submit" class="button secondary">测试并使用</button>
+            <button id="upstream-auto" type="button" class="text-button">恢复自动选择</button>
+          </form>
+        </div>
       </details>
 
       <details class="safety">
-        <summary>安全与隐私边界</summary>
+        <summary><span>安全与隐私边界</span><small>本机代理，不读取内容</small></summary>
         <ul>
           <li>仅监听本机 <code>127.0.0.1:17890</code>，不启用 TUN 或系统全局代理。</li>
           <li>不解密 HTTPS，不读取 Codex 对话、代码、账号令牌或 VPN 配置。</li>
-          <li>VPN 不可用时默认阻止直连，避免在断线时静默绕过代理。</li>
-          <li>导出的诊断仅包含状态、域名、错误类别和延迟；代理凭据会脱敏。</li>
+          <li>VPN 不可用时默认阻止直连，避免断线时静默绕过代理。</li>
+          <li>导出诊断只包含状态、域名、错误类别和延迟；代理凭据会脱敏。</li>
         </ul>
       </details>
 
-      <pre id="output" class="hidden"></pre>
-      <footer>非 OpenAI 官方项目 · 不修改 VPN，不启用 TUN，不读取 Codex 对话或令牌。</footer>
+      <pre id="output" class="output hidden"></pre>
+      <footer>非 OpenAI 官方项目 · 仅保护 Codex 的网络连接</footer>
     </main>
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>

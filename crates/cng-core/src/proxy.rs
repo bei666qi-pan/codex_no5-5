@@ -31,6 +31,13 @@ const MAX_HEADER_BYTES: usize = 32 * 1024;
 const PROBE_HOST: &str = "chatgpt.com";
 const PROBE_PORT: u16 = 443;
 
+/// `reqwest` enables rustls' ring provider while the direct rustls dependency
+/// also enables its default provider. Select ring explicitly before building a
+/// TLS client so the process never panics when both are linked.
+pub fn install_rustls_provider() {
+    let _ = rustls::crypto::ring::default_provider().install_default();
+}
+
 pub trait IoStream: AsyncRead + AsyncWrite + Unpin + Send {}
 impl<T> IoStream for T where T: AsyncRead + AsyncWrite + Unpin + Send {}
 pub type BoxedIo = Box<dyn IoStream>;
@@ -303,6 +310,7 @@ async fn http_connect(
 }
 
 fn tls_client_config() -> Result<ClientConfig> {
+    install_rustls_provider();
     let mut roots = RootCertStore::empty();
     let result = rustls_native_certs::load_native_certs();
     for certificate in result.certs {
@@ -322,6 +330,7 @@ pub async fn refresh_health(
     previous: &[CandidateHealth],
     timeout_value: Duration,
 ) -> Vec<CandidateHealth> {
+    install_rustls_provider();
     let previous = previous
         .iter()
         .map(|value| (value.candidate.id.clone(), value.clone()))
@@ -506,6 +515,12 @@ pub fn redact_error(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn explicitly_selects_a_rustls_crypto_provider() {
+        install_rustls_provider();
+        assert!(rustls::crypto::CryptoProvider::get_default().is_some());
+    }
 
     #[test]
     fn parses_ipv4_and_ipv6_authority() {

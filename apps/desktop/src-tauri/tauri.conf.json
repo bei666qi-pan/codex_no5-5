@@ -12,9 +12,11 @@
       {
         "label": "main",
         "title": "Codex Network Guard",
-        "width": 520,
-        "height": 760,
-        "resizable": false,
+        "width": 600,
+        "height": 820,
+        "minWidth": 460,
+        "minHeight": 680,
+        "resizable": true,
         "center": true,
         "visible": true
       }

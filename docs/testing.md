@@ -16,10 +16,13 @@ The current suite covers:
 Run all checks with:
 
 ```bash
+node --test apps/desktop/ui/ui.test.js
 cargo fmt --all -- --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 ```
+
+The UI suite verifies the status-led hierarchy contract: healthy routes stay calm, VPN failures expose a recovery CTA, non-network failures keep their Codex action, and the rendered surface retains all functional control IDs. It runs in CI on macOS and Windows without browser-test dependencies.
 
 ## Manual macOS matrix
 

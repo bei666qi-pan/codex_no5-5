@@ -202,6 +202,7 @@ impl RpcHandler for AppState {
 #[tokio::main]
 async fn main() -> Result<()> {
     let _log_guard = init_logging()?;
+    cng_core::proxy::install_rustls_provider();
     let config = GuardConfig::load_or_create()?;
     anyhow::ensure!(
         config.listen.ip().is_loopback(),

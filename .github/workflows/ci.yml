@@ -23,6 +23,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Format
         run: cargo fmt --all -- --check
+      - name: UI behavior tests
+        run: node --test apps/desktop/ui/ui.test.js
       - name: Clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: Test
