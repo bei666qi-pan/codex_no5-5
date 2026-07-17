@@ -1,0 +1,10 @@
+/target
+/node_modules
+/.DS_Store
+*.log
+部署凭证.txt
+.env
+.env.*
+!.env.example
+apps/desktop/dist
+apps/desktop/src-tauri/gen

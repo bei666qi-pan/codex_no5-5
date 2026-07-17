@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Codex Network Guard",
+  "version": "0.1.0",
+  "identifier": "dev.codex-network-guard.app",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "label": "main",
+        "title": "Codex Network Guard",
+        "width": 520,
+        "height": 680,
+        "resizable": false,
+        "center": true,
+        "visible": true
+      }
+    ],
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["dmg", "app"],
+    "category": "Utility",
+    "shortDescription": "Stable proxy routing and diagnostics for Codex",
+    "longDescription": "An unofficial, open-source network guard for Codex App and CLI.",
+    "macOS": {
+      "minimumSystemVersion": "13.0"
+    }
+  }
+}

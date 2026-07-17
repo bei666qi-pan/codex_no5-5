@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Codex Network Guard</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <div class="brand-mark">CNG</div>
+        <div>
+          <p class="eyebrow">非官方开源项目</p>
+          <h1>Codex Network Guard</h1>
+        </div>
+      </header>
+
+      <section class="hero" aria-live="polite">
+        <span id="status-dot" class="dot unknown"></span>
+        <div>
+          <h2 id="status-title">正在检测连接…</h2>
+          <p id="status-detail">正在连接本地守护进程</p>
+        </div>
+      </section>
+
+      <section id="onboarding" class="onboarding hidden">
+        <p class="eyebrow">首次启用</p>
+        <h3>让 Codex 固定走当前 VPN</h3>
+        <ol>
+          <li id="step-codex">检测 Codex</li>
+          <li id="step-vpn">检测 VPN 代理并测试连接</li>
+          <li id="step-service">安装登录自启守护进程</li>
+        </ol>
+        <button id="install" class="primary">一键检测并启用</button>
+        <p id="restart-tip" class="hidden">已启用。请关闭并重新打开一次 Codex，之后无需重复操作。</p>
+        <button id="migrate-legacy" class="quiet hidden">备份并停用旧版 Guard</button>
+      </section>
+
+      <section class="facts">
+        <article><span>本地入口</span><strong id="relay">—</strong></article>
+        <article><span>当前上游</span><strong id="upstream">—</strong></article>
+        <article><span>连接延迟</span><strong id="latency">—</strong></article>
+        <article><span>手机远程</span><strong id="remote">—</strong></article>
+      </section>
+
+      <section id="diagnostic" class="notice hidden">
+        <strong id="diagnostic-class">最近诊断</strong>
+        <p id="diagnostic-message"></p>
+      </section>
+
+      <section class="actions">
+        <button id="refresh" class="primary">重新检测</button>
+        <button id="open-codex">打开 Codex</button>
+        <button id="remote-start">开启手机远程</button>
+        <button id="remote-pair">生成配对码</button>
+        <button id="doctor">查看诊断</button>
+        <button id="pause" class="quiet">暂停保护</button>
+      </section>
+
+      <pre id="output" class="hidden"></pre>
+      <footer>不修改 VPN，不启用 TUN，不读取 Codex 对话或令牌。</footer>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>
