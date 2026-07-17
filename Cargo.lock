@@ -531,6 +531,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "cng-core",
+ "ico",
  "png 0.17.16",
  "serde",
  "serde_json",

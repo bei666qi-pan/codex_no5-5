@@ -6,6 +6,7 @@ license.workspace = true
 rust-version.workspace = true
 
 [build-dependencies]
+ico = "0.5"
 png = "0.17"
 tauri-build = { version = "2.5", features = [] }
 
