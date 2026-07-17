@@ -47,6 +47,7 @@
       <section id="diagnostic" class="notice hidden">
         <strong id="diagnostic-class">最近诊断</strong>
         <p id="diagnostic-message"></p>
+        <button id="diagnostic-action" class="notice-action hidden"></button>
       </section>
 
       <section class="actions">
@@ -55,11 +56,32 @@
         <button id="remote-start">开启手机远程</button>
         <button id="remote-pair">生成配对码</button>
         <button id="doctor">查看诊断</button>
+        <button id="export-diagnostic">导出脱敏诊断</button>
         <button id="pause" class="quiet">暂停保护</button>
       </section>
 
+      <details class="advanced">
+        <summary>高级：自动检测不到 VPN 时，手动填写本地代理</summary>
+        <p>仅填写 VPN 软件在本机暴露的地址，例如 <code>http://127.0.0.1:7890</code> 或 <code>socks5h://127.0.0.1:7891</code>。</p>
+        <form id="upstream-form">
+          <input id="upstream-input" type="text" autocomplete="off" placeholder="http://127.0.0.1:7890" />
+          <button type="submit">测试并使用</button>
+          <button id="upstream-auto" type="button" class="quiet">恢复自动选择</button>
+        </form>
+      </details>
+
+      <details class="safety">
+        <summary>安全与隐私边界</summary>
+        <ul>
+          <li>仅监听本机 <code>127.0.0.1:17890</code>，不启用 TUN 或系统全局代理。</li>
+          <li>不解密 HTTPS，不读取 Codex 对话、代码、账号令牌或 VPN 配置。</li>
+          <li>VPN 不可用时默认阻止直连，避免在断线时静默绕过代理。</li>
+          <li>导出的诊断仅包含状态、域名、错误类别和延迟；代理凭据会脱敏。</li>
+        </ul>
+      </details>
+
       <pre id="output" class="hidden"></pre>
-      <footer>不修改 VPN，不启用 TUN，不读取 Codex 对话或令牌。</footer>
+      <footer>非 OpenAI 官方项目 · 不修改 VPN，不启用 TUN，不读取 Codex 对话或令牌。</footer>
     </main>
     <script src="app.js"></script>
   </body>

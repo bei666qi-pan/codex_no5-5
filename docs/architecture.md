@@ -14,7 +14,7 @@
 
 The relay is deliberately a raw tunnel rather than a TLS-terminating proxy. For `CONNECT`, it establishes the selected HTTP/HTTPS/SOCKS5 upstream tunnel, returns `200 Connection Established`, then copies bytes bidirectionally. For absolute-form plain HTTP, it strips proxy-only headers and forwards origin-form requests through the same tunnel.
 
-The control plane is JSON-lines RPC v1 over a per-user Unix Socket on macOS and a local Windows named pipe on Windows. The Unix Socket containing directory is `0700` and the socket is `0600`; the Windows pipe is not a network listener. Public enums use snake-case serialized names. v1 additions must use optional/defaultable fields; existing fields and meanings must not be removed or changed.
+The control plane is JSON-lines RPC v1 over a per-user Unix Socket on macOS and a local Windows named pipe on Windows. The Unix Socket containing directory is `0700` and the socket is `0600`; the Windows pipe is not a network listener. Public enums use snake-case serialized names. Status includes additive `guidance` text and a constrained UI action so desktop and CLI present the same next step for VPN, account, limit, server, and Codex-process failures. v1 additions must be additive; existing fields and meanings must not be removed or changed.
 
 ## Candidate selection
 
@@ -28,7 +28,7 @@ A previously working candidate gets one degraded grace result before becoming do
 
 ## Privacy model
 
-The guard records operational metadata only. It never terminates destination TLS, so it cannot read URL paths inside HTTPS, request bodies, Codex conversations or bearer tokens. Error formatting removes proxy URL credentials and replaces the home directory with `~`. A credential-bearing manual proxy URL is stored in Keychain rather than TOML.
+The guard records operational metadata only. It never terminates destination TLS, so it cannot read URL paths inside HTTPS, request bodies, Codex conversations or bearer tokens. Error formatting removes proxy URL credentials and replaces the home directory with `~`. Candidate URLs are also redacted at JSON serialization time, so RPC status and exported diagnostics cannot expose an environment-provided proxy username or password. A credential-bearing manual proxy URL is stored in Keychain rather than TOML.
 
 ## macOS integration
 

@@ -5,8 +5,8 @@
 The current suite covers:
 
 - PAC route parsing and relay-loop rejection
-- candidate ordering and credential redaction
-- failure classification and JSON-RPC version rejection
+- candidate ordering and credential redaction, including serialized status/diagnostic output
+- failure classification, user-facing next-step guidance, and JSON-RPC version rejection
 - HTTP CONNECT byte tunnelling and upstream HTTP 407
 - disabled direct fallback with a target-side leakage assertion
 - upstream replacement affecting only new connections
@@ -40,6 +40,7 @@ On Windows 10/11 x64, verify the following in both a standard user account and a
 - VPN port change and restart recovery without restarting the guard.
 - Task Scheduler creation, login restart, uninstall restoration of `CODEX_CLI_PATH`, and absence of a global WinHTTP proxy change.
 - Desktop, CLI, named-pipe `status --json`, remote-control feature fallback, and a portable ZIP launch with WebView2.
+- Desktop guidance actions for VPN unavailable, paused protection, 401/403, 429, 5xx, and Codex process failures; verify that the exported diagnostic contains no proxy credentials.
 
 ## Release gates
 

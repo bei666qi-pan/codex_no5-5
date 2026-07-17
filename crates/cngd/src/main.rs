@@ -65,6 +65,7 @@ impl AppState {
         } else {
             GuardStatusKind::VpnUnavailable
         };
+        let guidance = cng_core::diagnostics::guidance_for(status, last_failure.as_ref());
         GuardStatus {
             api_version: RPC_API_VERSION,
             status,
@@ -77,6 +78,7 @@ impl AppState {
             codex_path: codex::find_real_codex(Some(&config))
                 .map(|path| path.display().to_string()),
             uptime_secs: self.started.elapsed().as_secs(),
+            guidance,
         }
     }
 

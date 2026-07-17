@@ -24,7 +24,8 @@ h1 { margin: 0; font-size: 21px; }
 .facts span { display: block; color: #8d9a95; font-size: 11px; margin-bottom: 6px; }
 .facts strong { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .notice { padding: 13px 15px; margin-bottom: 14px; border-radius: 12px; background: rgba(255, 116, 108, .09); border: 1px solid rgba(255, 116, 108, .24); }
-.notice p { margin: 5px 0 0; font-size: 12px; color: #c4cdca; max-height: 48px; overflow: hidden; }
+.notice p { margin: 5px 0 0; font-size: 12px; color: #c4cdca; white-space: pre-line; }
+.notice-action { margin-top: 10px; padding: 7px 10px; font-size: 12px; border-color: rgba(255, 116, 108, .35); }
 .actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
 button { appearance: none; border: 1px solid #34413d; border-radius: 11px; padding: 11px 12px; background: #1b2421; color: inherit; font: inherit; font-size: 13px; cursor: pointer; }
 button:hover { border-color: #65e6b7; }
@@ -47,3 +48,13 @@ footer { margin-top: 22px; text-align: center; color: #6f7b77; font-size: 11px; 
 .onboarding li.done { color: #65e6b7; }
 .onboarding li.done::marker { content: "✓  "; }
 .onboarding #restart-tip { color: #65e6b7; line-height: 1.5; }
+.advanced, .safety { margin-top: 14px; padding: 13px 15px; border: 1px solid #252d2b; border-radius: 12px; background: rgba(21, 27, 26, .72); }
+.advanced summary, .safety summary { cursor: pointer; color: #d7e0dd; font-size: 13px; }
+.advanced p, .safety li { color: #9ba9a4; font-size: 12px; line-height: 1.55; }
+.advanced p { margin: 10px 0; }
+.advanced form { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.advanced input { min-width: 0; padding: 10px; border: 1px solid #34413d; border-radius: 10px; background: #0d1117; color: inherit; font: inherit; font-size: 12px; }
+.advanced #upstream-auto { grid-column: 1 / -1; }
+.safety ul { margin: 10px 0 0; padding-left: 18px; }
+.safety li + li { margin-top: 5px; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #9ee8ce; }

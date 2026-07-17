@@ -249,5 +249,12 @@ fn print_status(value: Value, as_json: bool) -> Result<()> {
             failure.class, failure.summary
         );
     }
+    println!(
+        "Next step: {} — {}",
+        status.guidance.title, status.guidance.detail
+    );
+    if let Some(action) = status.guidance.action_label {
+        println!("Suggested action: {action}");
+    }
     Ok(())
 }

@@ -1,4 +1,5 @@
 use std::process::Stdio;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 use tauri::menu::{Menu, MenuItem};
@@ -38,6 +39,32 @@ async fn remote_action(action: String) -> Result<Value, String> {
 #[tauri::command]
 async fn doctor() -> Result<Value, String> {
     rpc("doctor", Value::Null).await
+}
+
+#[tauri::command]
+async fn export_diagnostic() -> Result<String, String> {
+    let report = doctor().await?;
+    let destination = dirs::desktop_dir()
+        .or_else(|| cng_core::config::app_support_dir().ok())
+        .ok_or_else(|| "cannot determine a location for the diagnostic report".to_string())?;
+    let stamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| error.to_string())?
+        .as_secs();
+    let path = destination.join(format!("cng-diagnostic-{stamp}.json"));
+    let encoded = serde_json::to_vec_pretty(&report).map_err(|error| error.to_string())?;
+    cng_core::config::write_private(&path, &encoded).map_err(|error| error.to_string())?;
+    Ok(path.display().to_string())
+}
+
+#[tauri::command]
+async fn set_upstream(url: String) -> Result<Value, String> {
+    let value = url.trim();
+    if value.is_empty() || value.eq_ignore_ascii_case("auto") {
+        rpc("upstream.auto", Value::Null).await
+    } else {
+        rpc("upstream.set", serde_json::json!({ "url": value })).await
+    }
 }
 
 #[tauri::command]
@@ -128,6 +155,8 @@ fn main() {
             set_paused,
             remote_action,
             doctor,
+            export_diagnostic,
+            set_upstream,
             service_status,
             install_guard,
             migrate_legacy_guard,

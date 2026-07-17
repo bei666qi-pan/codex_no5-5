@@ -12,19 +12,25 @@ const labels = {
 
 function render(status) {
   current = status;
-  const [title, detail, className] = labels[status.status] || ["未知状态", "请运行诊断", "unknown"];
-  $("status-title").textContent = title;
-  $("status-detail").textContent = detail;
+  const fallback = labels[status.status] || ["未知状态", "请运行诊断", "unknown"];
+  const guidance = status.guidance || { title: fallback[0], detail: fallback[1] };
+  const className = fallback[2];
+  $("status-title").textContent = guidance.title;
+  $("status-detail").textContent = guidance.detail;
   $("status-dot").className = `dot ${className}`;
   $("relay").textContent = status.listen || "—";
   $("upstream").textContent = status.active_upstream?.candidate?.label || "无可用上游";
   $("latency").textContent = status.active_upstream?.latency_ms != null ? `${status.active_upstream.latency_ms} ms` : "—";
   $("remote").textContent = status.remote_control?.online ? "在线" : status.remote_control?.supported ? "离线" : "当前版本不支持";
   $("pause").textContent = status.paused ? "恢复保护" : "暂停保护";
-  if (status.last_failure) {
+  const showGuidance = status.status !== "protected" || status.last_failure;
+  if (showGuidance) {
     $("diagnostic").classList.remove("hidden");
-    $("diagnostic-class").textContent = `最近诊断 · ${status.last_failure.class}`;
-    $("diagnostic-message").textContent = status.last_failure.summary;
+    $("diagnostic-class").textContent = status.last_failure ? `最近诊断 · ${status.last_failure.class}` : "下一步";
+    $("diagnostic-message").textContent = status.last_failure ? `${status.last_failure.summary}\n\n${guidance.detail}` : guidance.detail;
+    const action = $("diagnostic-action");
+    action.textContent = guidance.action_label || "";
+    action.classList.toggle("hidden", !guidance.action_label);
   } else {
     $("diagnostic").classList.add("hidden");
   }
@@ -47,12 +53,53 @@ async function showOutput(value) {
   $("output").textContent = typeof value === "string" ? value : JSON.stringify(value, null, 2);
 }
 
+async function runGuidanceAction() {
+  const action = current?.guidance?.action;
+  try {
+    if (action === "refresh") return load("refresh_guard");
+    if (action === "resume_protection") return render(await invoke("set_paused", { paused: false }));
+    if (action === "open_codex") return invoke("open_codex");
+    if (action === "wait") {
+      const path = await invoke("export_diagnostic");
+      return showOutput(`已导出脱敏诊断：${path}`);
+    }
+  } catch (error) {
+    return showOutput(String(error));
+  }
+}
+
 $("refresh").addEventListener("click", () => load("refresh_guard"));
 $("open-codex").addEventListener("click", () => invoke("open_codex"));
 $("remote-start").addEventListener("click", async () => showOutput(await invoke("remote_action", { action: "start" })));
 $("remote-pair").addEventListener("click", async () => showOutput(await invoke("remote_action", { action: "pair" })));
 $("doctor").addEventListener("click", async () => showOutput(await invoke("doctor")));
+$("export-diagnostic").addEventListener("click", async () => {
+  try {
+    const path = await invoke("export_diagnostic");
+    await showOutput(`已导出脱敏诊断：${path}`);
+  } catch (error) {
+    await showOutput(String(error));
+  }
+});
 $("pause").addEventListener("click", async () => render(await invoke("set_paused", { paused: !current?.paused })));
+$("diagnostic-action").addEventListener("click", runGuidanceAction);
+$("upstream-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  try {
+    render(await invoke("set_upstream", { url: $("upstream-input").value }));
+    await showOutput("本地代理已验证并启用。若 VPN 改端口，可随时点击“恢复自动选择”。");
+  } catch (error) {
+    await showOutput(`未能使用该代理：${error}`);
+  }
+});
+$("upstream-auto").addEventListener("click", async () => {
+  try {
+    render(await invoke("set_upstream", { url: "auto" }));
+    await showOutput("已恢复自动选择。CNG 会继续发现 VPN 当前的本地入口。");
+  } catch (error) {
+    await showOutput(String(error));
+  }
+});
 $("install").addEventListener("click", async () => {
   const button = $("install");
   button.disabled = true;

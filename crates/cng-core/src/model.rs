@@ -2,7 +2,7 @@ use std::cmp::Ordering;
 use std::time::Duration;
 
 use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, Serializer};
 use url::Url;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -78,8 +78,23 @@ pub struct UpstreamCandidate {
     pub id: String,
     pub kind: UpstreamKind,
     pub source: CandidateSource,
+    #[serde(serialize_with = "serialize_redacted_url")]
     pub url: Url,
     pub label: String,
+}
+
+fn serialize_redacted_url<S>(url: &Url, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut redacted = url.clone();
+    if !url.username().is_empty() {
+        let _ = redacted.set_username("redacted");
+    }
+    if url.password().is_some() {
+        let _ = redacted.set_password(Some("redacted"));
+    }
+    serializer.serialize_str(redacted.as_str())
 }
 
 impl std::fmt::Debug for UpstreamCandidate {
@@ -225,6 +240,18 @@ pub struct GuardStatus {
     pub remote_control: RemoteControlStatus,
     pub codex_path: Option<String>,
     pub uptime_secs: u64,
+    /// A short, user-facing explanation and next action. Added fields remain
+    /// backwards compatible for JSON-RPC consumers that ignore unknown keys.
+    pub guidance: UserGuidance,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct UserGuidance {
+    pub title: String,
+    pub detail: String,
+    pub action_label: Option<String>,
+    /// One of `refresh`, `resume_protection`, `open_codex`, or `wait`.
+    pub action: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -306,5 +333,19 @@ mod tests {
         let text = format!("{candidate:?}");
         assert!(!text.contains("alice"));
         assert!(!text.contains("secret"));
+    }
+
+    #[test]
+    fn serialized_candidates_never_expose_proxy_credentials() {
+        let candidate = UpstreamCandidate::from_url(
+            Url::parse("http://alice:top-secret@127.0.0.1:7890").unwrap(),
+            CandidateSource::Manual,
+            "manual",
+        )
+        .unwrap();
+        let encoded = serde_json::to_string(&candidate).unwrap();
+        assert!(!encoded.contains("alice"));
+        assert!(!encoded.contains("top-secret"));
+        assert!(encoded.contains("redacted"));
     }
 }
